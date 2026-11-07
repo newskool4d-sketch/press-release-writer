@@ -817,9 +817,10 @@ sealed class MainWindow : Window
     FrameworkElement ReviewStrip()
     {
         reviewShow = Action("검토 보기", () => SetReviewVisible(true), lockWhileBusy: false);
-        reviewShow.Content = new TextBlock { Text = "검토 보기", LayoutTransform = new RotateTransform(90) };
+        // Upright characters stacked in a column read naturally on a vertical strip; rotated text does not.
+        reviewShow.Content = new TextBlock { Text = "검\n토\n보\n기", TextAlignment = TextAlignment.Center, LineHeight = 20, LineStackingStrategy = LineStackingStrategy.BlockLineHeight };
         reviewShow.ToolTip = "접어 둔 검토 칸을 다시 폅니다.";
-        reviewShow.Padding = new(3, 10, 3, 10);
+        reviewShow.Padding = new(5, 9, 5, 9);
         reviewShow.Margin = new(6, 10, 0, 0);
         reviewShow.VerticalAlignment = VerticalAlignment.Top;
         System.Windows.Automation.AutomationProperties.SetName(reviewShow, "검토 칸 보이기");

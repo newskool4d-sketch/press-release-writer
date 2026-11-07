@@ -12,15 +12,15 @@
 - **작성 조건**에서 반려 사유 사전 점검과 사진 여부·담당 부서를 입력하면 탑재 기한·보도 시점이 바로 계산되고, 검토 칸이 지양 표현·외국어·공문서식 날짜를 표시합니다.
 - 앱이 새 버전을 내려받으면 **종료 시 적용**으로 표시됩니다. 작업을 저장하고 정상 종료한 뒤 다시 열면 새 버전을 사용합니다.
 
-소스 빌드와 검증 방법은 [소스 안내](source/README.md), 사용 절차는 [v0.1.15 사용 안내](사용안내_v0.1.15.md)에 있습니다.
+소스 빌드와 검증 방법은 [소스 안내](source/README.md), 사용 절차는 [v0.1.16 사용 안내](사용안내_v0.1.16.md)에 있습니다.
 
 상단 **도움말 → 사용 안내**에서 앱에 포함된 HTML 안내서를 바로 열 수 있습니다.
 
 ## HTML 사용 안내
 
-[HTML 안내서 다운로드](https://github.com/newskool4d-sketch/press-release-writer/releases/download/v0.1.15/PressReleaseWriter-Guide-ko.html) 후 브라우저에서 열어 주세요. 그림과 스타일을 포함한 단일 파일이며 상단에서 라이트·다크 모드와 글자 크기(14~22px)를 조절할 수 있습니다. 보기 설정은 브라우저에 저장됩니다.
+[HTML 안내서 다운로드](https://github.com/newskool4d-sketch/press-release-writer/releases/download/v0.1.16/PressReleaseWriter-Guide-ko.html) 후 브라우저에서 열어 주세요. 그림과 스타일을 포함한 단일 파일이며 상단에서 라이트·다크 모드와 글자 크기(14~22px)를 조절할 수 있습니다. 보기 설정은 브라우저에 저장됩니다.
 
-저장소의 `사용안내_v0.1.15.html`도 같은 파일입니다. 아래 명령은 저장소 루트에서 실행합니다. Python 3와 Node.js가 필요합니다.
+저장소의 `사용안내_v0.1.16.html`도 같은 파일입니다. 아래 명령은 저장소 루트에서 실행합니다. Python 3와 Node.js가 필요합니다.
 
 ```text
 python scripts/build_html_guide.py
@@ -28,4 +28,4 @@ python scripts/verify_html_guide.py
 node scripts/check_guide_controls.cjs
 ```
 
-제작 스크립트는 `docs/images`의 가상 자료 화면과 기존 기관 도안을 HTML 안에 포함합니다. 릴리스용 사본은 `artifacts/v0.1.15/release/PressReleaseWriter-Guide-ko.html`에 생성합니다. 검증은 HTML 구조·내장 이미지·CSP와 보기 설정 로직을 확인하며, 실제 브라우저 렌더링은 별도로 확인합니다.
+제작 스크립트는 `docs/images`의 가상 자료 화면과 기존 기관 도안을 HTML 안에 포함합니다. 릴리스용 사본은 `artifacts/v0.1.16/release/PressReleaseWriter-Guide-ko.html`에 생성합니다. 검증은 HTML 구조·내장 이미지·CSP와 보기 설정 로직을 확인하며, 실제 브라우저 렌더링은 별도로 확인합니다.

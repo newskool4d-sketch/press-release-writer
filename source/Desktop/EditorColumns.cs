@@ -39,7 +39,8 @@ sealed class EditorColumns : Grid
         Add(review, 3);
         reviewStrip.HorizontalAlignment = HorizontalAlignment.Left;
         Add(reviewStrip, 3);
-        ReviewVisible = true;
+        // Start from the opposite state so the first call applies the visibility of both the panel and the strip.
+        ReviewVisible = !reviewVisible;
         SetReviewVisible(reviewVisible);
 
         var divider = new GridSplitter

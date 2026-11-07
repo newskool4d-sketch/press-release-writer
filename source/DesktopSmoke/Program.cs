@@ -419,11 +419,20 @@ static class Program
         // The review column folds into a slim strip and hands its width to the editors; unfolding restores the old widths.
         var review = (FrameworkElement)columns.Children[2];
         var reviewStrip = (FrameworkElement)columns.Children[3];
+        Require(columns.ReviewVisible && review.Visibility == Visibility.Visible && reviewStrip.Visibility == Visibility.Collapsed,
+            "a fresh window shows the review column and hides the fold strip");
         Field<Button>(window, "reviewHide").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Arrange(1264, 791, "review-collapsed.png");
         Require(!columns.ReviewVisible && review.Visibility == Visibility.Collapsed && reviewStrip.Visibility == Visibility.Visible &&
             columns.ColumnDefinitions[3].ActualWidth < 60 && columns.ColumnDefinitions[2].ActualWidth > draftWidth - 32 + 80,
             $"hiding the review column hands its width to the editors ({columns.ColumnDefinitions[3].ActualWidth:F0} DIP strip)");
+        var stripCenter = reviewStrip.TranslatePoint(new Point(reviewStrip.ActualWidth / 2, reviewStrip.ActualHeight / 2), surface);
+        var stripHit = System.Windows.Media.VisualTreeHelper.HitTest(surface, stripCenter)?.VisualHit;
+        var insideStrip = false;
+        for (var d = stripHit; d != null; d = System.Windows.Media.VisualTreeHelper.GetParent(d))
+            if (ReferenceEquals(d, reviewStrip)) { insideStrip = true; break; }
+        Require(reviewStrip.IsEnabled && insideStrip,
+            $"the fold strip is hit-testable at its center (hit {stripHit?.GetType().Name ?? "none"} {(stripHit as FrameworkElement)?.Name}/{((stripHit as FrameworkElement)?.Parent as FrameworkElement)?.GetType().Name}, enabled {reviewStrip.IsEnabled}, {reviewStrip.ActualWidth:F0}x{reviewStrip.ActualHeight:F0} at {stripCenter.X:F0},{stripCenter.Y:F0})");
         Field<Button>(window, "reviewShow").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Arrange(1264, 791);
         Require(columns.ReviewVisible && review.Visibility == Visibility.Visible && reviewStrip.Visibility == Visibility.Collapsed &&
