@@ -24,6 +24,15 @@ static class Program
         SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
         try
         {
+            var guide = UserGuide.Extract(directory);
+            var guideBytes = File.ReadAllBytes(guide);
+            Require(Encoding.UTF8.GetString(guideBytes).Contains("guide-theme") &&
+                Encoding.UTF8.GetString(guideBytes).Contains("guide-size"), "embedded offline guide includes reading controls");
+            Require(UserGuide.Extract(directory) == guide && File.ReadAllBytes(guide).SequenceEqual(guideBytes),
+                "help uses stable path and preserves embedded guide bytes");
+            File.WriteAllText(guide, "stale guide");
+            UserGuide.Extract(directory);
+            Require(File.ReadAllBytes(guide).SequenceEqual(guideBytes), "help refreshes stale extracted content");
             var clean = Window(directory, _ => throw new Exception("Clean window should not confirm"));
             CloseAndWait(clean);
             Require(true, "clean close leaves Closing event before retry");

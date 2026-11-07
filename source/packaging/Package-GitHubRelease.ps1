@@ -14,7 +14,7 @@ $zip = Join-Path $release 'PressReleaseWriter-win-x64.zip'
 $zipTemp = "$zip.$([Guid]::NewGuid().ToString('N')).tmp"
 
 # The explicit list keeps test fixtures, local data, source, and credentials out of the package.
-$entries = @('PressReleaseWriter.exe', '사용안내.md', 'notices/dotnet-license.txt', 'notices/dotnet-third-party.txt',
+$entries = @('PressReleaseWriter.exe', '사용안내.md', '사용안내.html', 'notices/dotnet-license.txt', 'notices/dotnet-third-party.txt',
     'notices/nsis-copyright.txt', 'notices/pdfpig-license.txt')
 foreach ($entry in $entries) {
     if (-not (Test-Path -LiteralPath (Join-Path $portable $entry) -PathType Leaf)) { throw "Missing packaged file: $entry" }

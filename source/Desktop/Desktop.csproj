@@ -7,11 +7,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AssemblyName>PressReleaseWriter</AssemblyName>
-    <Version>0.1.11</Version>
+    <Version>0.1.12</Version>
     <ApplicationIcon>Assets/press-release.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Core/Core.csproj" /></ItemGroup>
   <ItemGroup><InternalsVisibleTo Include="DesktopSmoke" /></ItemGroup>
+  <ItemGroup><EmbeddedResource Include="../../사용안내_v0.1.12.html" LogicalName="PressReleaseDesktop.UserGuide.html" /></ItemGroup>
   <ItemGroup>
     <Resource Include="Assets/press-release.ico" />
     <Resource Include="Assets/press-release.png" />

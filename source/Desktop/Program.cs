@@ -180,6 +180,14 @@ sealed class MainWindow : Window
         System.Windows.Automation.AutomationProperties.SetName(settingsButton, "설정");
         System.Windows.Automation.AutomationProperties.SetHelpText(settingsButton, "AI 연결과 화면 설정을 선택합니다.");
         config.Children.Add(settingsButton);
+        var help = Dropdown("도움말", null, false, MenuAction("사용 안내", () => RunUi(() =>
+        {
+            var path = UserGuide.Extract(appFolder);
+            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        }), lockWhileBusy: false));
+        System.Windows.Automation.AutomationProperties.SetName(help, "도움말");
+        System.Windows.Automation.AutomationProperties.SetHelpText(help, "HTML 사용 안내를 기본 브라우저에서 엽니다.");
+        config.Children.Add(help);
         Place(connectionPanel, config, 0, 0);
         connectionState.SetResourceReference(TextBlock.ForegroundProperty, Muted);
         connectionState.SetResourceReference(TextBlock.FontSizeProperty, "WorkspaceSmallSize");
