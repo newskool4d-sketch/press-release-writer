@@ -346,6 +346,31 @@ static class Program
             Near(source.FontSize, window.FontSize) && Near(draft.FontSize, window.FontSize),
             "fractional point size updates the window and both existing editors immediately");
 
+        // The dropdown menus must paint their whole surface in the theme color; the default template left a light icon gutter.
+        var menu = Field<Button>(window, "settingsButton").ContextMenu!;
+        menu.Measure(new Size(400, 400));
+        var menuSize = new Size(Math.Ceiling(menu.DesiredSize.Width), Math.Ceiling(menu.DesiredSize.Height));
+        menu.Arrange(new Rect(menuSize));
+        menu.UpdateLayout();
+        var menuBitmap = new RenderTargetBitmap((int)menuSize.Width, (int)menuSize.Height, 96, 96, PixelFormats.Pbgra32);
+        menuBitmap.Render(menu);
+        var gutter = new byte[4];
+        var centre = new byte[4];
+        menuBitmap.CopyPixels(new Int32Rect(3, (int)menuSize.Height / 2, 1, 1), gutter, 4, 0);
+        menuBitmap.CopyPixels(new Int32Rect((int)menuSize.Width / 2, 2, 1, 1), centre, 4, 0);
+        var paper = ((SolidColorBrush)menu.Background).Color;
+        Require(paper.R < 0x40 && Math.Abs(gutter[2] - paper.R) < 8 && Math.Abs(gutter[1] - paper.G) < 8 && Math.Abs(gutter[0] - paper.B) < 8 &&
+            gutter.SequenceEqual(centre) && menuSize.Width > 60 && menuSize.Height > 40,
+            $"dark dropdown menu has no light gutter (left {gutter[2]},{gutter[1]},{gutter[0]} vs paper {paper.R},{paper.G},{paper.B}, {menuSize.Width}x{menuSize.Height})");
+        if (preview != null)
+        {
+            Directory.CreateDirectory(preview);
+            var menuPng = new PngBitmapEncoder();
+            menuPng.Frames.Add(BitmapFrame.Create(menuBitmap));
+            using var file = File.Create(Path.Combine(preview, "settings-menu-dark.png"));
+            menuPng.Save(file);
+        }
+
         font.Value = 20;
         var update = Field<Button>(window, "updateButton");
         update.Visibility = Visibility.Visible;
