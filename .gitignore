@@ -1,0 +1,13 @@
+.tools/
+artifacts/
+reviews/
+**/bin/
+**/obj/
+**/codex-home/
+**/GeminiProfile/
+**/settings.json
+**/auth.json
+**/credentials.json
+**/token.json
+*.user
+*.suo

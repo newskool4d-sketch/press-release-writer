@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>PressReleaseWriter</AssemblyName>
+    <Version>0.1.11</Version>
+    <ApplicationIcon>Assets/press-release.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /></ItemGroup>
+  <ItemGroup><InternalsVisibleTo Include="DesktopSmoke" /></ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets/press-release.ico" />
+    <Resource Include="Assets/press-release.png" />
+    <Resource Include="Assets/incheon-education-ci.jpg" />
+    <Resource Include="Assets/student-success-slogan.jpg" />
+  </ItemGroup>
+</Project>
