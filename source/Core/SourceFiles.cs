@@ -48,8 +48,15 @@ public static class SourceFiles
         catch (DecoderFallbackException)
         {
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-            return new(Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback,
-                DecoderFallback.ExceptionFallback).GetString(data), "CP949로 읽었습니다. 한글이 올바른지 확인해 주세요.");
+            try
+            {
+                return new(Encoding.GetEncoding(949, EncoderFallback.ExceptionFallback,
+                    DecoderFallback.ExceptionFallback).GetString(data), "CP949로 읽었습니다. 한글이 올바른지 확인해 주세요.");
+            }
+            catch (DecoderFallbackException)
+            {
+                throw new InvalidDataException("텍스트 파일의 인코딩을 확인해 주세요. UTF-8로 저장한 뒤 다시 열어 주세요.");
+            }
         }
     }
 

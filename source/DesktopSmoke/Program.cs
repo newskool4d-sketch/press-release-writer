@@ -167,6 +167,18 @@ static class Program
         Require(failure.Contains("초안 저장 실패") && failure.Contains("하나 이상 선택") &&
             failure.Contains(output) && Directory.GetFiles(output).Length == 2 && draft.Text.Contains("75명"),
             "save with no format explains the failure, shows the folder, and preserves the draft");
+        Field<CheckBox>(window, "saveHwpx").IsChecked = true;
+        Field<TextBox>(window, "department").Text = "검증과 검증팀";
+        Field<ComboBox>(window, "photo").SelectedIndex = 1;
+        save.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var formFiles = Directory.GetFiles(output, "*.hwpx");
+        var formText = formFiles.Length == 1 ? SourceFiles.Read(formFiles[0]).Text : "";
+        Require(formFiles.Length == 1 && Directory.GetFiles(output).Length == 3 && formText.Contains("행사 제목") &&
+            formText.Contains("중학생 75명이 참여했다.") && formText.Contains("검증과 검증팀") && formText.Contains("(없음) -") &&
+            Field<TextBlock>(window, "status").Text.Contains("한글에서 직접"),
+            "save with the form option writes the filled official HWPX and tells the officer what to fill by hand");
+        Require(Field<TextBlock>(window, "conditionChecks").Text.Contains("사진 없음") &&
+            Field<TextBlock>(window, "conditionChecks").Text.Contains("계산 생략"), "condition checks follow the form inputs");
         CloseAndWait(window);
     }
 

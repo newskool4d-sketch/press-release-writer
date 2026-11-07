@@ -1,4 +1,4 @@
-"""Build the offline v0.1.12 guide from public-safe, synthetic screenshots."""
+"""Build the offline v0.1.13 guide from public-safe, synthetic screenshots."""
 from pathlib import Path
 import base64
 import hashlib
@@ -16,9 +16,9 @@ HTML = r'''<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="인천교육 보도자료 작성기 v0.1.12 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
+  <meta name="description" content="인천교육 보도자료 작성기 v0.1.13 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-@@SCRIPTHASH@@'; base-uri 'none'; form-action 'none'">
-  <title>인천교육 보도자료 작성기 · v0.1.12 사용 안내</title>
+  <title>인천교육 보도자료 작성기 · v0.1.13 사용 안내</title>
   <style>
     :root { color-scheme: light; --paper:#fbfaf7; --ink:#253735; --muted:#526560; --line:#d6dfd9; --accent:#226c65; --wash:#edf4ef; }
     * { box-sizing:border-box; }
@@ -128,7 +128,7 @@ HTML = r'''<!doctype html>
 <a class="skip" href="#main">본문으로 이동</a>
 <header class="mast">
   <img src="@@CI@@" alt="인천광역시교육청" width="1271" height="335">
-  <p>보도자료 작성기<br>사용 안내 · v0.1.12</p>
+  <p>보도자료 작성기<br>사용 안내 · v0.1.13</p>
 </header>
 <div class="layout">
 <nav aria-label="사용 안내 목차">
@@ -145,7 +145,7 @@ HTML = r'''<!doctype html>
   </ol>
 </nav>
 <main id="main">
-<div class="version">인천교육 보도자료 작성기 · v0.1.12</div>
+<div class="version">인천교육 보도자료 작성기 · v0.1.13</div>
 <div class="reading-tools" role="group" aria-label="안내서 보기 설정" hidden>
   <label for="guide-theme">화면 <select id="guide-theme"><option value="light">라이트 모드</option><option value="dark">다크 모드</option></select></label>
   <label for="guide-size">글자 크기 <input id="guide-size" type="range" min="14" max="22" step="1" value="16"><output id="guide-size-value" for="guide-size" aria-live="polite">16px</output></label>
@@ -164,13 +164,13 @@ HTML = r'''<!doctype html>
 
 <section id="start">
   <h2><small>01</small>처음 시작하기</h2>
-  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.12">v0.1.12 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
+  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.13">v0.1.13 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
   <p>현재 배포본은 서명되지 않은 Windows x64용입니다. 실행 전 배포 저장소와 파일 출처를 확인하세요.</p>
   <ol class="quick">
     <li><strong>AI 연결</strong><a href="#connect">설정 → AI 연결</a>에서 로그인 또는 API 키 연결을 마칩니다.</li>
     <li><strong>원자료 입력</strong><a href="#source">원문</a>에는 근거 자료를, <a href="#source">작성 조건</a>에는 선택값과 확인 정보를 넣습니다.</li>
     <li><strong>초안 검토</strong><a href="#draft">초안 생성</a> 후 사실을 확인하고 맞춤법 수정안을 검토합니다.</li>
-    <li><strong>파일 저장</strong><a href="#save">작업 폴더</a>를 고르고 TXT·MD를 선택한 뒤 초안 저장을 누릅니다.</li>
+    <li><strong>파일 저장</strong><a href="#save">작업 폴더</a>를 고르고 TXT·MD·HWPX를 선택한 뒤 초안 저장을 누릅니다.</li>
   </ol>
 </section>
 
@@ -205,7 +205,9 @@ HTML = r'''<!doctype html>
       <thead><tr><th scope="col">입력 위치</th><th scope="col">내용</th></tr></thead>
       <tbody>
         <tr><th scope="row">원문</th><td>행사 개요, 계획서에서 추출한 내용, 확인된 발언, 기존 보도자료 초안 등 작성·검토의 근거가 되는 자료</td></tr>
-        <tr><th scope="row">작성 조건</th><td>기관 구분, 보도 시점, 작성 유형을 선택합니다. 공식 기관명·행사 시작일·행사 종료일·보도 희망일·탑재 예정 시각·대상·인원·기보도 자료에는 확인된 값을 입력합니다.</td></tr>
+        <tr><th scope="row">작성 조건</th><td>기관 구분, 보도 시점, 작성 유형을 선택합니다. 공식 기관명·행사 시작일·행사 종료일·보도 희망일·탑재 예정 시각·대상·인원·기보도 자료·사진 여부·담당 부서·팀에는 확인된 값을 입력합니다.</td></tr>
+        <tr><th scope="row">반려 사유 사전 점검</th><td>기보도, 50명 이하 교직원 연수·원격 연수, 직원 복지·친목 행사, 교직원 개인 수상, 단순 협약·견학·반복 회의, 협의 단계, 단순 강사 소개·단순 업무 수행, 타 기관 사업을 담당자가 ‘해당 / 비해당 / 미확인’으로 선택합니다. ‘해당’이 있으면 작성 보류를 검토합니다.</td></tr>
+        <tr><th scope="row">작성 조건 점검</th><td>입력한 날짜로 탑재 기한(보도 희망일 전날 15시), 행사 당일·익일 보도, 3일 이상 경과 여부를 바로 계산해 표시합니다. 휴일과 행사 후 2일째는 담당자 확인으로 남기며, 같은 결과가 초안 생성 시 AI에 전달됩니다.</td></tr>
       </tbody>
     </table>
   </div>
@@ -224,7 +226,7 @@ HTML = r'''<!doctype html>
   <p>기존 원고를 검토하려면 <strong>원문</strong>에 기존 초안을 넣고, <strong>작성 조건 → 작성 유형 → 기존 초안 검토</strong>를 선택한 뒤 <strong>초안 생성</strong>을 누릅니다. 맞춤법만 검사할 때는 기존 원고를 가운데 초안 입력칸에 붙여넣고 <strong>맞춤법 검사</strong>를 누르세요.</p>
   <ol>
     <li>원문과 작성 조건을 확인하고 <strong>초안 생성</strong>을 누릅니다.</li>
-    <li>가운데 <strong>초안 작성·편집</strong>에 표시된 원고를 읽고 직접 편집합니다. 오른쪽 <strong>검토</strong> 영역의 분량·확인 안내도 함께 봅니다.</li>
+    <li>가운데 <strong>초안 작성·편집</strong>에 표시된 원고를 읽고 직접 편집합니다. 오른쪽 <strong>검토</strong> 영역의 분량·확인 안내도 함께 봅니다. 이 영역은 지침이 지양하는 표현(뜻깊·열띤·획기적·성공적으로 운영 등), 쉬운 우리말로 바꿀 외국어(매뉴얼·멘토·멘토링·프로젝트·TF·리더십·데이터·채널 등), ‘2026. 4. 18.’ 같은 공문서식 날짜도 표시합니다. 표시는 참고용이며 최종 판단은 담당자가 합니다.</li>
     <li><strong>맞춤법 검사</strong>를 누릅니다. 현재 편집 중인 초안을 선택한 AI가 검토합니다.</li>
     <li><strong>맞춤법 수정안 확인</strong>에서 원문·수정안·수정 이유를 비교한 뒤 <strong>수정안 적용</strong> 또는 <strong>적용하지 않기</strong>를 선택합니다.</li>
     <li>적용을 취소하려면 초안 입력칸에 포커스를 두고 <kbd>Ctrl</kbd> + <kbd>Z</kbd>를 누릅니다. 다른 편집 이후에는 직전 편집부터 차례로 되돌아갑니다.</li>
@@ -238,14 +240,15 @@ HTML = r'''<!doctype html>
 </section>
 
 <section id="save">
-  <h2><small>05</small>TXT·MD로 저장하기</h2>
+  <h2><small>05</small>TXT·MD·HWPX로 저장하기</h2>
   <ol>
     <li>하단 <strong>작업 폴더 ▾ → 폴더 지정</strong>에서 실제 저장할 폴더를 고릅니다.</li>
-    <li><strong>TXT</strong>와 <strong>MD</strong> 중 필요한 형식을 체크합니다. 두 형식을 함께 저장할 수도 있습니다.</li>
+    <li><strong>TXT</strong>, <strong>MD</strong>, <strong>HWPX</strong> 중 필요한 형식을 체크합니다. 여러 형식을 함께 저장할 수도 있습니다.</li>
     <li><strong>초안 저장</strong>을 누르고 하단에 표시된 파일명·전체 저장 경로·완료 안내를 확인합니다.</li>
     <li><strong>작업 폴더 ▾ → 폴더 열기</strong>로 파일을 확인합니다.</li>
   </ol>
-  <p>기본 파일명은 <code>날짜_보도자료_초안.txt</code>와 <code>날짜_보도자료_초안.md</code>입니다. 같은 이름이 있으면 새 이름으로 저장합니다. MD는 제목·강조 등 서식 기호를 유지하고 TXT는 해당 기호를 정리하므로 표시 형식에 차이가 있습니다.</p>
+  <p>기본 파일명은 <code>날짜_보도자료_초안.txt</code>, <code>날짜_보도자료_초안.md</code>, <code>날짜_보도자료_초안.hwpx</code>입니다. 같은 이름이 있으면 새 이름으로 저장합니다. MD는 제목·강조 등 서식 기호를 유지하고 TXT는 해당 기호를 정리하므로 표시 형식에 차이가 있습니다.</p>
+  <p><strong>HWPX</strong>는 인천광역시교육청 보도자료 양식에 제목·본문 문단·보도 희망일·제공일·사진 여부·담당 부서를 채운 파일입니다. 초안의 ‘## 보도자료 초안’ 아래 제목 한 줄과 본문 문단이 구분되어 있어야 하며, 작성 보류 초안은 양식으로 저장하지 않습니다. 자료문의 이름·연락처는 한글에서 직접 기재하고, 누리집 탑재 전에 한글로 열어 서식을 확인하세요.</p>
   <aside class="note"><p><strong>폴더를 여는 것만으로는 저장되지 않습니다.</strong> 초안을 고친 뒤에는 다시 <strong>초안 저장</strong>을 눌러야 합니다. 원자료와 편집 내용이 다음 실행에 자동 복원된다고 가정하지 말고, 앱을 닫기 전에 필요한 원고를 파일로 저장하세요.</p></aside>
   <p>저장이 실패하면 하단 오류 안내와 표시된 경로를 먼저 확인하고 쓰기 가능한 폴더를 다시 지정합니다. 생성된 파일을 확인하기 전에는 앱을 닫지 마세요.</p>
 </section>
@@ -262,13 +265,13 @@ HTML = r'''<!doctype html>
 
 <section id="update">
   <h2><small>07</small>자동 업데이트</h2>
-  <p>앱은 시작할 때와 실행 중 6시간마다 공식 GitHub 릴리스를 확인합니다. <strong>업데이트 확인</strong>으로 직접 확인할 수도 있습니다.</p>
+  <p>앱은 시작할 때와 실행 중 6시간마다 공식 GitHub 릴리스 정보를 확인합니다. <strong>업데이트 확인</strong>으로 직접 확인할 수도 있습니다. 이 단계에서는 실행 파일을 내려받지 않습니다.</p>
   <ol>
-    <li>새 버전을 내려받고 검증한 뒤 <strong>종료 시 적용</strong> 안내가 표시되는지 확인합니다.</li>
+    <li>새 버전이 있으면 버튼이 <strong>vX.Y.Z 내려받기</strong>로 바뀝니다. 누르면 실행 파일을 내려받아 검증하고 <strong>종료 시 적용</strong> 안내가 표시됩니다.</li>
     <li>작업 중인 초안을 저장하고 앱을 정상 종료합니다.</li>
     <li>앱을 다시 실행해 새 버전을 사용합니다.</li>
   </ol>
-  <p>실행 파일이 있는 폴더에 쓰기 권한이 필요합니다. 교체한 이전 실행 파일은 같은 폴더에 <code>.bak</code>으로 보관합니다. 자동 업데이트는 실행 파일에 적용되며 최신 안내 파일은 릴리스에서 별도로 내려받을 수 있습니다.</p>
+  <p>실행 파일이 있는 폴더에 쓰기 권한이 필요합니다. PC를 바로 끄면 준비된 파일은 적용되지 않고 삭제됩니다. 교체한 이전 실행 파일은 같은 폴더에 가장 최근 <code>.bak</code> 하나만 보관합니다. 자동 업데이트는 실행 파일에 적용되며 최신 안내 파일은 릴리스에서 별도로 내려받을 수 있습니다.</p>
 </section>
 
 <section id="help">
@@ -299,7 +302,7 @@ HTML = r'''<!doctype html>
   </details>
 </section>
 <footer>
-  <p>인천교육 보도자료 작성기 v0.1.12 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.12">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
+  <p>인천교육 보도자료 작성기 v0.1.13 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.13">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
   <p>이 HTML은 그림·스타일을 포함하므로 내려받아 브라우저에서 바로 열 수 있습니다. 외부 링크와 AI 서비스 이용에는 인터넷 연결이 필요합니다. 화면 예시는 가상 자료이며 실제 보도자료가 아닙니다.</p>
 </footer>
 </main>
@@ -345,8 +348,8 @@ HTML = HTML.replace("@@PROOFREAD@@", data_uri(SHOTS / "proofreading.png", "image
 script = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
 HTML = HTML.replace("@@SCRIPTHASH@@", base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
 payload = HTML.encode("utf-8")
-local = ROOT / "사용안내_v0.1.12.html"
-release = ROOT / "artifacts/v0.1.12/release/PressReleaseWriter-Guide-ko.html"
+local = ROOT / "사용안내_v0.1.13.html"
+release = ROOT / "artifacts/v0.1.13/release/PressReleaseWriter-Guide-ko.html"
 release.parent.mkdir(parents=True, exist_ok=True)
 local.write_bytes(payload)
 release.write_bytes(payload)

@@ -5,7 +5,9 @@ using System.Text.RegularExpressions;
 namespace PressRelease;
 
 public sealed record ProofreadingEdit(string Before, string After, string Reason);
-public sealed record ProofreadingResult(string Original, string Corrected, IReadOnlyList<ProofreadingEdit> Edits);
+/// <summary>A suggestion the app refused to apply, with the rule it broke. Excerpts are truncated for display.</summary>
+public sealed record ProofreadingSkip(string Excerpt, string Reason);
+public sealed record ProofreadingResult(string Original, string Corrected, IReadOnlyList<ProofreadingEdit> Edits, IReadOnlyList<ProofreadingSkip> Skipped);
 
 public static class Proofreading
 {
@@ -66,32 +68,48 @@ public static class Proofreading
             if (edits.GetArrayLength() > MaxEdits) throw Invalid("한 번에 적용할 수 있는 교정 항목 수를 넘었습니다.");
             var quotes = QuotedRanges(original);
             var located = new List<(int Start, ProofreadingEdit Edit)>();
+            var skipped = new List<ProofreadingSkip>();
+            // A suggestion that breaks a rule is skipped on its own so the remaining valid suggestions still reach the user.
             foreach (var entry in edits.EnumerateArray())
             {
-                if (!HasOnlyProperties(entry, "before", "after", "reason"))
-                    throw Invalid("교정 항목 형식을 확인할 수 없습니다.");
-                var before = ReadText(entry, "before");
-                var after = ReadText(entry, "after");
-                var reason = ReadText(entry, "reason");
+                if (!HasOnlyProperties(entry, "before", "after", "reason") || ReadText(entry, "before") is not { } before ||
+                    ReadText(entry, "after") is not { } after || ReadText(entry, "reason") is not { } reason)
+                {
+                    skipped.Add(new(Excerpt(entry.ToString()), "교정 항목 형식을 확인할 수 없음"));
+                    continue;
+                }
                 if (string.IsNullOrWhiteSpace(before) || string.IsNullOrWhiteSpace(after) || string.IsNullOrWhiteSpace(reason) ||
                     before.Length > MaxExcerptLength || after.Length > MaxExcerptLength || reason.Length > MaxExcerptLength)
-                    throw Invalid("교정 구간이나 근거가 비어 있거나 너무 깁니다.");
+                {
+                    skipped.Add(new(Excerpt(before), "교정 구간이나 근거가 비어 있거나 너무 김"));
+                    continue;
+                }
                 var start = original.IndexOf(before, StringComparison.Ordinal);
                 if (start < 0 || original.IndexOf(before, start + 1, StringComparison.Ordinal) >= 0)
-                    throw Invalid("교정 대상 구간을 원고에서 한 곳으로 특정할 수 없습니다. 다시 검사해 주세요.");
+                {
+                    skipped.Add(new(Excerpt(before), start < 0 ? "원고에 없는 구간" : "원고에서 한 곳으로 특정할 수 없는 구간"));
+                    continue;
+                }
                 if (before == after) continue;
                 if (quotes.Any(range => start < range.End && start + before.Length > range.Start))
-                    throw Invalid("직접 인용과 겹치는 수정안이 있어 적용하지 않았습니다.");
-                if (!SameMatches(Numbers, before, after))
-                    throw Invalid("숫자가 달라지는 수정안이 있어 적용하지 않았습니다.");
-                if (!SameMatches(LineBreaks, before, after) || !SameMatches(Marks, before, after))
-                    throw Invalid("인용 기호나 문서 구조가 달라지는 수정안이 있어 적용하지 않았습니다.");
-                located.Add((start, new ProofreadingEdit(before, after, reason)));
+                    skipped.Add(new(Excerpt(before), "직접 인용과 겹침"));
+                else if (!SameMatches(Numbers, before, after))
+                    skipped.Add(new(Excerpt(before), "숫자가 달라짐"));
+                else if (!SameMatches(LineBreaks, before, after) || !SameMatches(Marks, before, after))
+                    skipped.Add(new(Excerpt(before), "인용 기호나 문서 구조가 달라짐"));
+                else
+                    located.Add((start, new ProofreadingEdit(before, after, reason)));
             }
             located.Sort((left, right) => left.Start.CompareTo(right.Start));
-            for (var index = 1; index < located.Count; index++)
+            for (var index = 1; index < located.Count;)
+            {
                 if (located[index].Start < located[index - 1].Start + located[index - 1].Edit.Before.Length)
-                    throw Invalid("서로 겹치는 교정 항목이 있어 적용하지 않았습니다.");
+                {
+                    skipped.Add(new(Excerpt(located[index].Edit.Before), "다른 교정 항목과 겹침"));
+                    located.RemoveAt(index);
+                }
+                else index++;
+            }
 
             var corrected = new StringBuilder(original);
             foreach (var item in located.AsEnumerable().Reverse())
@@ -102,7 +120,7 @@ public static class Proofreading
             var text = corrected.ToString();
             // Check the full result too: adjacent edits must not join separate numbers.
             if (!SameMatches(Numbers, original, text)) throw Invalid("원고의 숫자 구성이 달라지는 수정안이 있어 적용하지 않았습니다.");
-            return new(original, text, located.Select(item => item.Edit).ToArray());
+            return new(original, text, located.Select(item => item.Edit).ToArray(), skipped);
         }
         catch (JsonException)
         {
@@ -124,14 +142,17 @@ public static class Proofreading
             names.All(name => properties.Contains(name, StringComparer.Ordinal));
     }
 
-    static string ReadText(JsonElement entry, string name)
+    static string? ReadText(JsonElement entry, string name)
     {
-        var value = entry.GetProperty(name);
-        if (value.ValueKind != JsonValueKind.String) throw Invalid("교정 항목은 문자열이어야 합니다.");
+        if (!entry.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.String) return null;
         var text = value.GetString()!;
-        if (text.Any(character => char.IsControl(character) && character is not '\r' and not '\n' and not '\t'))
-            throw Invalid("교정 항목에 표시할 수 없는 문자가 있습니다.");
-        return text;
+        return text.Any(character => char.IsControl(character) && character is not '\r' and not '\n' and not '\t') ? null : text;
+    }
+
+    static string Excerpt(string value)
+    {
+        var text = LineBreaks.Replace(value, " ");
+        return text.Length <= 40 ? text : text[..40] + "…";
     }
 
     static bool SameMatches(Regex pattern, string before, string after) =>
@@ -156,7 +177,12 @@ public static class Proofreading
             var close = character switch { '"' => '"', '\'' => '\'', '“' => '”', '‘' => '’', '「' => '」', '『' => '』', _ => '\0' };
             if (close != '\0') stack.Push((close, index));
         }
-        foreach (var unmatched in stack) result.Add((unmatched.Start, text.Length));
+        // An opening quote that is never closed protects the rest of its paragraph, not the rest of the draft.
+        foreach (var unmatched in stack)
+        {
+            var end = text.IndexOfAny(['\r', '\n'], unmatched.Start);
+            result.Add((unmatched.Start, end < 0 ? text.Length : end));
+        }
         return result;
     }
 

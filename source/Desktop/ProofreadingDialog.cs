@@ -37,9 +37,12 @@ sealed class ProofreadingDialog : Window
         AddEditor(columns, "수정 후", result.Corrected, 2);
         Grid.SetRow(columns, 1);
         root.Children.Add(columns);
+        var applied = string.Join("\n\n", result.Edits.Select((edit, index) => $"{index + 1}. {edit.Before} → {edit.After}\n{edit.Reason}"));
+        var skipped = result.Skipped.Count == 0 ? "" : "\n\n[적용하지 않은 제안]\n" +
+            string.Join("\n", result.Skipped.Select(skip => $"- {skip.Excerpt} · {skip.Reason}"));
         var edits = new TextBox
         {
-            Text = string.Join("\n\n", result.Edits.Select((edit, index) => $"{index + 1}. {edit.Before} → {edit.After}\n{edit.Reason}")),
+            Text = applied + skipped,
             IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Margin = new Thickness(0, 12, 0, 12)

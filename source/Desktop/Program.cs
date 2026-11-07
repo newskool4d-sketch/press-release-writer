@@ -59,10 +59,17 @@ sealed class MainWindow : Window
     readonly TextBlock connectionState = Caption("");
     readonly Dictionary<ModelConnection, AiConnectionStatus> connectionStates = new();
     readonly TextBox officialName = new(), eventStart = new(), eventEnd = new(), publicationDate = new(), uploadAt = new(), targetCount = new(), priorCoverage = new();
+    readonly ComboBox photo = new() { ItemsSource = new[] { "있음", "없음", "확인 필요" }, SelectedIndex = 2 };
+    readonly TextBox department = new();
+    // One selector per guideline rejection category; the officer's judgement is sent as the baseline instead of a model guess.
+    readonly ComboBox[] rejections = Writing.RejectionReasons
+        .Select(_ => new ComboBox { ItemsSource = Writing.RejectionStatuses, SelectedIndex = 2 }).ToArray();
+    readonly TextBlock conditionChecks = Caption("");
     readonly TextBlock status = Caption("AI 연결을 선택하고 원자료를 입력해 주세요.");
     readonly Border statusBar = new() { CornerRadius = new(4), Padding = new(10, 5, 10, 5) };
     readonly CheckBox saveTxt = new() { Content = "TXT", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     readonly CheckBox saveMd = new() { Content = "MD", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
+    readonly CheckBox saveHwpx = new() { Content = "HWPX", IsChecked = false, VerticalAlignment = VerticalAlignment.Center };
     readonly List<Control> whileBusy = [];
     readonly CancellationTokenSource updateCancellation = new();
     readonly DispatcherTimer updateTimer = new() { Interval = TimeSpan.FromHours(6) };
@@ -74,6 +81,7 @@ sealed class MainWindow : Window
     TaskCompletionSource? runningCompletion;
     CodexAppServer? codex;
     Task? updateCheck;
+    AvailableUpdate? availableUpdate;
     StagedUpdate? stagedUpdate;
     string folder = "";
     string googleProject = "";
@@ -105,6 +113,7 @@ sealed class MainWindow : Window
         appearance = new WorkspaceAppearance(settings.DarkMode, settings.FontPoints);
         folder = settings.Folder ?? "";
         googleProject = settings.GoogleProject ?? "";
+        department.Text = settings.Department ?? "";
         var modelItems = Providers.Select(provider => new ModelItem(provider)).ToArray();
         models.ItemsSource = modelItems;
         var savedModel = settings.Model switch
@@ -115,8 +124,8 @@ sealed class MainWindow : Window
         };
         models.SelectedItem = modelItems.FirstOrDefault(item => item.Connection == savedModel) ?? modelItems[0];
         System.Windows.Automation.AutomationProperties.SetName(models, "사용할 AI");
-        whileBusy.AddRange([models, institutions, tenses, modes, source, draft, saveTxt, saveMd,
-            officialName, eventStart, eventEnd, publicationDate, uploadAt, targetCount, priorCoverage]);
+        whileBusy.AddRange([models, institutions, tenses, modes, source, draft, saveTxt, saveMd, saveHwpx,
+            officialName, eventStart, eventEnd, publicationDate, uploadAt, targetCount, priorCoverage, photo, department, .. rejections]);
 
         var root = GridRows("auto", "auto", "*", "auto");
         root.Margin = new(12);
@@ -139,7 +148,7 @@ sealed class MainWindow : Window
         heading.SetResourceReference(TextBlock.FontSizeProperty, "WorkspaceTitleSize");
         heading.SetResourceReference(TextBlock.ForegroundProperty, "BrandInk");
         header.Children.Add(heading);
-        updateButton = Action("업데이트 확인", StartUpdateCheck, lockWhileBusy: false);
+        updateButton = Action("업데이트 확인", () => StartUpdateCheck(automatic: false), lockWhileBusy: false);
         updateButton.Visibility = Visibility.Collapsed;
         updateButton.Margin = new(0, 0, 12, 0);
         updateButton.VerticalAlignment = VerticalAlignment.Center;
@@ -216,8 +225,11 @@ sealed class MainWindow : Window
         var save = new WrapPanel { Margin = new(0, 0, 0, 4) };
         saveTxt.Margin = new(2, 0, 0, 4);
         save.Children.Add(saveTxt);
-        saveMd.Margin = new(12, 0, 14, 4);
+        saveMd.Margin = new(12, 0, 12, 4);
         save.Children.Add(saveMd);
+        saveHwpx.Margin = new(0, 0, 14, 4);
+        saveHwpx.ToolTip = "공식 양식 저장 · 인천광역시교육청 보도자료 양식에 제목·본문·보도 희망일·사진 여부·담당 부서를 채워 저장합니다. 자료문의 이름과 연락처는 한글에서 직접 기재합니다.";
+        save.Children.Add(saveHwpx);
         save.Children.Add(Action("초안 저장", SaveDraft));
         save.Children.Add(Dropdown("작업 폴더", null, true, MenuAction("폴더 지정", () => RunUi(() => TryPickFolder())),
             MenuAction("폴더 열기", () => RunUi(() =>
@@ -243,20 +255,31 @@ sealed class MainWindow : Window
             checks.Text = string.IsNullOrWhiteSpace(draft.Text) ? "초안을 입력하거나 생성하면 점검 항목이 표시됩니다." : Writing.Check(draft.Text);
         };
         source.TextChanged += (_, _) => sourceDirty = true;
-        foreach (var field in new[] { officialName, eventStart, eventEnd, publicationDate, uploadAt, targetCount, priorCoverage })
-            field.TextChanged += (_, _) => sourceDirty = true;
+        foreach (var field in new[] { officialName, eventStart, eventEnd, publicationDate, uploadAt, targetCount, priorCoverage, department })
+            field.TextChanged += (_, _) => { sourceDirty = true; UpdateConditionChecks(); };
+        foreach (var selector in rejections.Append(photo))
+            selector.SelectionChanged += (_, _) => { sourceDirty = true; UpdateConditionChecks(); };
+        tenses.SelectionChanged += (_, _) => UpdateConditionChecks();
+        UpdateConditionChecks();
         models.SelectionChanged += (_, _) =>
         {
             UpdateConnectionButtons();
             Persist();
         };
         Closing += OnClosing;
-        Closed += (_, _) => updateCancellation.Dispose();
+        // Windows shutdown and logoff close the window without honoring Cancel, so the async close path cannot finish there.
+        var application = Application.Current;
+        if (application != null) application.SessionEnding += OnSessionEnding;
+        Closed += (_, _) =>
+        {
+            if (application != null) application.SessionEnding -= OnSessionEnding;
+            updateCancellation.Dispose();
+        };
         if (string.Equals(Path.GetFileName(Environment.ProcessPath), "PressReleaseWriter.exe", StringComparison.OrdinalIgnoreCase))
         {
             updateButton.Visibility = Visibility.Visible;
-            updateTimer.Tick += (_, _) => StartUpdateCheck();
-            Loaded += (_, _) => { updateTimer.Start(); StartUpdateCheck(); };
+            updateTimer.Tick += (_, _) => StartUpdateCheck(automatic: true);
+            Loaded += (_, _) => { updateTimer.Start(); StartUpdateCheck(automatic: true); };
         }
         ready = true;
         UpdateConnectionButtons();
@@ -523,10 +546,12 @@ sealed class MainWindow : Window
         return false;
     }
 
-    void StartUpdateCheck()
+    // Automatic runs only read release metadata. The executable is downloaded when the user clicks the offered version.
+    void StartUpdateCheck(bool automatic)
     {
         if (closingInProgress || updateCheck is { IsCompleted: false } || stagedUpdate != null) return;
-        updateCheck = CheckForUpdate();
+        if (availableUpdate is { } available && !automatic) updateCheck = DownloadUpdate(available);
+        else if (availableUpdate == null) updateCheck = CheckForUpdate();
     }
 
     async Task CheckForUpdate()
@@ -537,11 +562,11 @@ sealed class MainWindow : Window
         {
             var installed = typeof(MainWindow).Assembly.GetName().Version!;
             var current = new Version(installed.Major, installed.Minor, installed.Build);
-            stagedUpdate = await ReleaseUpdater.StageLatestAsync(current, appFolder, updateCancellation.Token);
-            if (stagedUpdate != null)
+            availableUpdate = await ReleaseUpdater.CheckLatestAsync(current, appFolder, updateCancellation.Token);
+            if (availableUpdate != null)
             {
-                updateButton.Content = $"v{stagedUpdate.Version} · 종료 시 적용";
-                updateButton.ToolTip = "앱을 정상 종료하면 새 실행 파일을 적용합니다. 다음 실행부터 새 버전을 사용합니다.";
+                updateButton.Content = $"v{availableUpdate.Version} 내려받기";
+                updateButton.ToolTip = $"새 버전 v{availableUpdate.Version}이 공개됐습니다. 누르면 실행 파일({availableUpdate.Size / (1024 * 1024)}MB)을 내려받아 검증하고, 정상 종료할 때 적용합니다.";
                 return;
             }
             updateButton.ToolTip = "설치된 버전보다 새로운 공개 릴리스가 없습니다.";
@@ -549,16 +574,57 @@ sealed class MainWindow : Window
         catch (OperationCanceledException) when (updateCancellation.IsCancellationRequested) { }
         catch (Exception)
         {
-            updateButton.ToolTip = "업데이트를 확인하거나 내려받지 못했습니다. 다시 확인할 수 있습니다.";
+            updateButton.ToolTip = "업데이트를 확인하지 못했습니다. 다시 확인할 수 있습니다.";
+        }
+        finally
+        {
+            if (availableUpdate == null && !closingInProgress) updateButton.Content = "업데이트 확인";
+            if (!closingInProgress) updateButton.IsEnabled = true;
+        }
+    }
+
+    async Task DownloadUpdate(AvailableUpdate available)
+    {
+        updateButton.Content = $"v{available.Version} 내려받는 중…";
+        updateButton.IsEnabled = false;
+        try
+        {
+            stagedUpdate = await ReleaseUpdater.StageAsync(available, appFolder, updateCancellation.Token);
+            updateButton.Content = $"v{stagedUpdate.Version} · 종료 시 적용";
+            updateButton.ToolTip = "앱을 정상 종료하면 새 실행 파일을 적용합니다. 다음 실행부터 새 버전을 사용합니다.";
+        }
+        catch (OperationCanceledException) when (updateCancellation.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            updateButton.ToolTip = $"업데이트 파일을 내려받지 못했습니다. 다시 시도할 수 있습니다.\n{UserMessage(ex)}";
         }
         finally
         {
             if (stagedUpdate == null && !closingInProgress)
             {
-                updateButton.Content = "업데이트 확인";
+                updateButton.Content = $"v{available.Version} 내려받기";
                 updateButton.IsEnabled = true;
             }
         }
+    }
+
+    void OnSessionEnding(object? sender, SessionEndingCancelEventArgs e)
+    {
+        if (closingApproved) return;
+        // Windows closes the window regardless of Cancel; do the synchronous part of the close path now.
+        // A staged update is not applied here: the helper would be terminated with the session, so it is discarded instead.
+        closingApproved = true;
+        closingInProgress = true;
+        Persist();
+        running?.Cancel();
+        updateCancellation.Cancel();
+        if (stagedUpdate is { } pending)
+        {
+            stagedUpdate = null;
+            try { ReleaseUpdater.Discard(pending); } catch (Exception) { }
+        }
+        // DisposeAsync kills the child process before its first await; the remaining wait is best effort.
+        _ = ResetCodex();
     }
 
     async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -581,6 +647,7 @@ sealed class MainWindow : Window
             updateTimer.Stop();
             updateCancellation.Cancel();
             if (updateCheck != null) await updateCheck;
+            if (closingApproved) return; // The session ended while waiting; OnSessionEnding already cleaned up.
             if (stagedUpdate != null)
             {
                 try
@@ -588,6 +655,7 @@ sealed class MainWindow : Window
                     if (!await ReleaseUpdater.LaunchApplyAsync(stagedUpdate)) ReleaseUpdater.Discard(stagedUpdate);
                 }
                 catch (Exception) { ReleaseUpdater.Discard(stagedUpdate); }
+                stagedUpdate = null;
             }
             closingApproved = true;
             // ResetCodex may complete synchronously; leave this Closing event before closing again.
@@ -640,8 +708,23 @@ sealed class MainWindow : Window
         facts.Children.Add(Field("탑재 예정 시각", uploadAt));
         facts.Children.Add(Field("대상·인원", targetCount));
         facts.Children.Add(Field("기보도 자료", priorCoverage));
+        facts.Children.Add(Field("사진 여부", photo));
+        facts.Children.Add(Field("담당 부서·팀", department));
         eventStart.ToolTip = eventEnd.ToolTip = publicationDate.ToolTip = "예: 2026-11-06";
         uploadAt.ToolTip = "예: 2026-11-05 14:30";
+        photo.ToolTip = "양식 상단의 필수 표기입니다. 사진이 있으면 초상권·보호자 동의를 확인하세요.";
+        department.ToolTip = "예: 교학과 교육과정운영팀 · 양식 머리말에 들어가며 다음 실행에 복원됩니다.";
+        facts.Children.Add(Subheading("반려 사유 사전 점검"));
+        var rejectionHint = Caption("담당자가 판단한 값을 선택하세요. 모르면 ‘미확인’으로 두고, ‘해당’이 있으면 작성 보류를 검토합니다.");
+        rejectionHint.SetResourceReference(TextBlock.ForegroundProperty, Muted);
+        rejectionHint.Margin = new(0, 0, 0, 6);
+        facts.Children.Add(rejectionHint);
+        for (var index = 0; index < rejections.Length; index++)
+            facts.Children.Add(Field(Writing.RejectionReasons[index], rejections[index]));
+        facts.Children.Add(Subheading("작성 조건 점검"));
+        conditionChecks.SetResourceReference(TextBlock.ForegroundProperty, Muted);
+        System.Windows.Automation.AutomationProperties.SetName(conditionChecks, "작성 조건 점검");
+        facts.Children.Add(conditionChecks);
         var tabs = new TabControl { Name = "SourceTabs" };
         tabs.Items.Add(new TabItem { Header = "원문", Content = original, ToolTip = "행사 개요, 계획서, 현장 결과 등 초안의 근거" });
         var optionsTab = new TabItem { Content = Scroll(facts), ToolTip = "보도 주체, 시점과 작성 유형을 선택" };
@@ -777,8 +860,7 @@ sealed class MainWindow : Window
     {
         if (running != null || !RequireAiConsent()) return;
         string prompt;
-        try { prompt = Writing.Prompt(source.Text.Trim(), new WritingContext(institutions.Text, tenses.Text, modes.SelectedIndex == 1,
-            officialName.Text, eventStart.Text, eventEnd.Text, publicationDate.Text, uploadAt.Text, targetCount.Text, priorCoverage.Text)); }
+        try { prompt = Writing.Prompt(source.Text.Trim(), CurrentContext()); }
         catch (Exception ex) { SetStatus(ex.Message, StatusError); return; }
         var model = Selected;
         if (!CanReplaceDraft()) return;
@@ -819,16 +901,17 @@ sealed class MainWindow : Window
     {
         if (draft.Text != original) throw new InvalidOperationException("검사 후 초안이 변경됐습니다. 현재 초안으로 맞춤법 검사를 다시 실행해 주세요.");
         var result = Proofreading.Parse(original, response);
+        var skippedNote = result.Skipped.Count == 0 ? "" : $" 규칙에 맞지 않는 제안 {result.Skipped.Count}건은 적용하지 않았습니다.";
         if (result.Edits.Count == 0)
         {
-            SetStatus("맞춤법 검사 완료 · 수정 제안이 없습니다. 고유명사와 인용문은 원자료와 대조해 주세요.", StatusSuccess);
+            SetStatus($"맞춤법 검사 완료 · 적용할 수정 제안이 없습니다.{skippedNote} 고유명사와 인용문은 원자료와 대조해 주세요.", StatusSuccess);
             return;
         }
         var dialog = new ProofreadingDialog(result, appearance) { Owner = this };
         if (dialog.ShowDialog() == true)
         {
             ApplyProofreading(result);
-            SetStatus($"맞춤법 수정 {result.Edits.Count}건을 적용했습니다. Ctrl+Z로 되돌릴 수 있습니다. 확인 후 초안을 저장하세요.", StatusSuccess);
+            SetStatus($"맞춤법 수정 {result.Edits.Count}건을 적용했습니다.{skippedNote} Ctrl+Z로 되돌릴 수 있습니다. 확인 후 초안을 저장하세요.", StatusSuccess);
         }
         else SetStatus("맞춤법 수정안을 적용하지 않았습니다. 기존 초안은 유지됩니다.", StatusNeutral);
     }
@@ -845,6 +928,13 @@ sealed class MainWindow : Window
         }
         finally { draft.EndChange(); }
     }
+
+    WritingContext CurrentContext() => new(institutions.Text, tenses.Text, modes.SelectedIndex == 1,
+        officialName.Text, eventStart.Text, eventEnd.Text, publicationDate.Text, uploadAt.Text, targetCount.Text, priorCoverage.Text,
+        photo.SelectedItem as string, department.Text,
+        Writing.RejectionReasons.Select((reason, index) => new RejectionCheck(reason, rejections[index].SelectedItem as string ?? Writing.Unverified)).ToArray());
+
+    void UpdateConditionChecks() => conditionChecks.Text = Writing.ContextCheck(CurrentContext());
 
     bool CanReplaceDraft() => !draftDirty || string.IsNullOrWhiteSpace(draft.Text) ||
         MessageBox.Show(this, "편집 중인 초안을 새 초안으로 바꿀까요?", Title, MessageBoxButton.YesNo) == MessageBoxResult.Yes;
@@ -867,16 +957,18 @@ sealed class MainWindow : Window
             if (string.IsNullOrWhiteSpace(draft.Text)) throw new InvalidDataException("저장할 초안을 입력해 주세요.");
             var txt = saveTxt.IsChecked == true;
             var md = saveMd.IsChecked == true;
-            if (!txt && !md) throw new InvalidOperationException("TXT 또는 MD를 하나 이상 선택해 주세요.");
+            var hwpx = saveHwpx.IsChecked == true;
+            if (!txt && !md && !hwpx) throw new InvalidOperationException("TXT, MD 또는 HWPX 양식을 하나 이상 선택해 주세요.");
             if (!Directory.Exists(folder) && !TryPickFolder())
             {
                 SetStatus("저장이 취소됐습니다. 작업 폴더를 선택한 뒤 다시 저장해 주세요.", StatusNeutral);
                 return;
             }
             var destination = Path.GetFullPath(folder);
-            var files = Writing.Save(destination, draft.Text, txt, md);
+            var files = Writing.Save(destination, draft.Text, txt, md, hwpx ? Writing.FormFields(draft.Text, CurrentContext()) : null);
             draftDirty = false;
-            SetStatus($"저장 완료 · {files.Replace("\n", " · ")}\n저장 위치: {destination}", StatusSuccess);
+            var formNote = hwpx ? "\n양식의 자료문의 이름·연락처는 한글에서 직접 기재해 주세요." : "";
+            SetStatus($"저장 완료 · {files.Replace("\n", " · ")}\n저장 위치: {destination}{formNote}", StatusSuccess);
         }
         catch (Exception ex)
         {
@@ -898,11 +990,14 @@ sealed class MainWindow : Window
         foreach (var control in whileBusy) control.IsEnabled = false;
         cancel.IsEnabled = true;
         connections?.SetBusy(true);
+        // The model selector is locked while busy, so Selected is the provider this work used.
+        // Only a Codex failure or cancellation needs the app-server restarted; other providers leave it untouched.
+        var usedCodex = affectsConnection && Selected == ModelConnection.CodexCli;
         try { await action(tokenSource.Token); }
         catch (OperationCanceledException)
         {
             SetStatus("작업을 취소했습니다.", StatusNeutral);
-            if (affectsConnection) await ResetCodex();
+            if (usedCodex) await ResetCodex();
         }
         catch (Exception ex)
         {
@@ -912,7 +1007,7 @@ sealed class MainWindow : Window
                 if (ex is FileNotFoundException or GeminiApiException { KeyRejected: true }
                     or CliExecutionException { Kind: CliFailureKind.Authentication or CliFailureKind.Installation })
                     SetConnectionStatus(Selected, ConnectionFailure(Selected, ex));
-                await ResetCodex();
+                if (usedCodex) await ResetCodex();
             }
         }
         finally
@@ -964,15 +1059,19 @@ sealed class MainWindow : Window
             var path = Path.Combine(appFolder, "settings.json");
             return File.Exists(path) ? JsonSerializer.Deserialize<Options>(File.ReadAllText(path)) ?? new() : new();
         }
-        catch (IOException) { return new(); }
-        catch (JsonException) { return new(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or JsonException)
+        {
+            // Settings are cosmetic. An unreadable file must never prevent the app from opening.
+            return new();
+        }
     }
 
     void Persist()
     {
         if (!ready) return;
         RunUi(() => File.WriteAllText(Path.Combine(appFolder, "settings.json"), JsonSerializer.Serialize(
-            new Options(folder, Selected, googleProject, appearance.IsDark, appearance.FontPoints, columns.SourceShare))));
+            new Options(folder, Selected, googleProject, appearance.IsDark, appearance.FontPoints, columns.SourceShare,
+                string.IsNullOrWhiteSpace(department.Text) ? null : department.Text.Trim()))));
     }
 
     Button Action(string title, Action action, string? style = null, bool lockWhileBusy = true)
@@ -1135,7 +1234,8 @@ sealed class MainWindow : Window
     }
 
     sealed record Options(string? Folder = null, ModelConnection Model = ModelConnection.CodexCli, string? GoogleProject = null,
-        bool DarkMode = false, double FontPoints = WorkspaceAppearance.DefaultFontPoints, double SourceShare = EditorColumns.DefaultSourceShare);
+        bool DarkMode = false, double FontPoints = WorkspaceAppearance.DefaultFontPoints, double SourceShare = EditorColumns.DefaultSourceShare,
+        string? Department = null);
     sealed record ModelItem(ModelConnection Connection)
     {
         public override string ToString() => Models.Label(Connection);

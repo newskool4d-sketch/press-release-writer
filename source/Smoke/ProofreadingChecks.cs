@@ -21,26 +21,34 @@ public static class ProofreadingChecks
             "proofreading/rejects empty or oversized drafts");
         require(Rejects(original, "broken") && Rejects(original, "{\"edits\":null}") && Rejects(original, "{\"edits\":[],\"edits\":[]}") &&
             Rejects(original, "{\"edits\":[],\"corrected\":\"ignored\"}"), "proofreading/rejects malformed or unexpected response structure");
-        require(Rejects(original, Response(("없는 구간", "새 내용", "수정"))), "proofreading/rejects a patch absent from the source");
-        require(Rejects("참여 하였다. 참여 하였다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))), "proofreading/rejects ambiguous occurrences");
-        require(Rejects("참여 하였다", Response(("참여 하였다", "참여하였다", "띄어쓰기"), ("하였다", "했다", "윤문"))) &&
-            Rejects("참여 하였다", Response(("참여 하였다", "참여하였다", "띄어쓰기"), ("참여 하였다", "참여하였다", "중복"))),
-            "proofreading/rejects overlapping or duplicate patches");
-        require(Rejects("학생 75명이 참여했다.", Response(("75명", "76명", "숫자 수정"))) &&
-            Rejects("11월 6일", Response(("11월 6일", "11월 7일", "날짜 수정"))), "proofreading/rejects number and date changes");
-        require(Rejects("그는 “참여 하였다”고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))) &&
-            Rejects("그는 \"참여 하였다\"고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))) &&
-            Rejects("그는 「참여 하였다」고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))) &&
-            Rejects("그는 ‘참여 하였다’고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))),
+        require(Skips(original, Response(("없는 구간", "새 내용", "수정"))), "proofreading/skips a patch absent from the source");
+        require(Skips("참여 하였다. 참여 하였다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))), "proofreading/skips ambiguous occurrences");
+        var overlapping = Proofreading.Parse("참여 하였다", Response(("참여 하였다", "참여하였다", "띄어쓰기"), ("하였다", "했다", "윤문")));
+        var duplicate = Proofreading.Parse("참여 하였다", Response(("참여 하였다", "참여하였다", "띄어쓰기"), ("참여 하였다", "참여하였다", "중복")));
+        require(overlapping is { Edits.Count: 1, Skipped.Count: 1, Corrected: "참여하였다" } &&
+            duplicate is { Edits.Count: 1, Skipped.Count: 1, Corrected: "참여하였다" },
+            "proofreading/applies the first patch and skips an overlapping or duplicate one");
+        require(Skips("학생 75명이 참여했다.", Response(("75명", "76명", "숫자 수정"))) &&
+            Skips("11월 6일", Response(("11월 6일", "11월 7일", "날짜 수정"))), "proofreading/skips number and date changes");
+        require(Skips("그는 “참여 하였다”고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))) &&
+            Skips("그는 \"참여 하였다\"고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))) &&
+            Skips("그는 「참여 하였다」고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))) &&
+            Skips("그는 ‘참여 하였다’고 말했다.", Response(("참여 하였다", "참여하였다", "띄어쓰기"))),
             "proofreading/protects straight and Korean quotation spans");
-        require(Rejects("'Let's check teh text.'", Response(("teh", "the", "오타"))),
+        require(Skips("'Let's check teh text.'", Response(("teh", "the", "오타"))),
             "proofreading/apostrophe inside a word does not close a quotation");
-        require(Rejects("그는 “참여 하였다", Response(("참여 하였다", "참여하였다", "띄어쓰기"))), "proofreading/protects an unmatched opening quotation");
-        require(Rejects("참여 하였다.\r\n다음 문단", Response(("참여 하였다.\r\n다음", "참여하였다. 다음", "문단 합침"))) &&
-            Rejects("**참여 하였다**", Response(("**참여 하였다**", "참여하였다", "기호 삭제"))), "proofreading/rejects paragraph and markup changes");
-        require(Rejects("참여 하였다", Response(("", "참여하였다", "수정"))) &&
-            Rejects("참여 하였다", Response(("참여 하였다", "", "삭제"))) &&
-            Rejects("참여 하였다", Response(("참여 하였다", "참여하였다", ""))), "proofreading/rejects empty excerpts and reasons");
+        require(Skips("그는 “참여 하였다", Response(("참여 하였다", "참여하였다", "띄어쓰기"))), "proofreading/protects an unmatched opening quotation");
+        require(Skips("참여 하였다.\r\n다음 문단", Response(("참여 하였다.\r\n다음", "참여하였다. 다음", "문단 합침"))) &&
+            Skips("**참여 하였다**", Response(("**참여 하였다**", "참여하였다", "기호 삭제"))), "proofreading/skips paragraph and markup changes");
+        require(Skips("참여 하였다", Response(("", "참여하였다", "수정"))) &&
+            Skips("참여 하였다", Response(("참여 하였다", "", "삭제"))) &&
+            Skips("참여 하였다", Response(("참여 하였다", "참여하였다", ""))), "proofreading/skips empty excerpts and reasons");
+        var mixed = Proofreading.Parse("학생 75명이 참여 하였다.", Response(("75명", "76명", "숫자 수정"), ("참여 하였다", "참여하였다", "띄어쓰기")));
+        require(mixed.Corrected == "학생 75명이 참여하였다." && mixed.Edits.Count == 1 && mixed.Skipped.Count == 1 &&
+            mixed.Skipped[0].Reason.Contains("숫자"), "proofreading/applies valid patches while reporting the skipped one");
+        var strayQuote = Proofreading.Parse("그는 “참여했다\r\n다음 문단은 참여 하였다.", Response(("참여 하였다", "참여하였다", "띄어쓰기")));
+        require(strayQuote.Edits.Count == 1 && strayQuote.Corrected.EndsWith("참여하였다."),
+            "proofreading/unmatched quotation protects only its own paragraph");
         require(Rejects(original, new string('x', 100_001)) &&
             Rejects("참여 하였다", Response(Enumerable.Repeat(("참여 하였다", "참여하였다", "띄어쓰기"), 41).ToArray())),
             "proofreading/bounds response length and edit count");
@@ -50,6 +58,10 @@ public static class ProofreadingChecks
         JsonSerializer.Serialize(new { edits = edits.Select(edit => new { before = edit.Before, after = edit.After, reason = edit.Reason }) });
 
     static bool Rejects(string original, string response) => Throws<InvalidDataException>(() => Proofreading.Parse(original, response));
+
+    // A rule violation leaves the draft unchanged and is reported, instead of discarding the whole response.
+    static bool Skips(string original, string response) =>
+        Proofreading.Parse(original, response) is { Edits.Count: 0, Skipped.Count: > 0 } result && result.Corrected == original;
 
     static bool Throws<T>(Action action) where T : Exception
     {

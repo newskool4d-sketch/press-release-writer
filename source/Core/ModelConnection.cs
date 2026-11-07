@@ -237,50 +237,68 @@ public static class Models
 
     public static string ParseReply(ModelConnection model, string output)
     {
+        // CLIs may print warnings or notices around the JSON they emit. Only the JSON payload is interpreted.
         if (model == ModelConnection.ClaudeCli)
         {
-            try
+            using var document = ParseEmbeddedObject(output, "Claude Code 응답 형식을 확인해 주세요.");
+            var root = document.RootElement;
+            if (root.TryGetProperty("is_error", out var error))
             {
-                using var document = JsonDocument.Parse(output);
-                var root = document.RootElement;
-                if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("is_error", out var error))
-                {
-                    if (error.ValueKind == JsonValueKind.True) throw Failure(1, output);
-                    if (error.ValueKind == JsonValueKind.False && root.TryGetProperty("result", out var result)
-                        && result.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(result.GetString()))
-                        return result.GetString()!;
-                }
+                if (error.ValueKind == JsonValueKind.True) throw Failure(1, output);
+                if (error.ValueKind == JsonValueKind.False && StringProperty(root, "result") is { } result && !string.IsNullOrWhiteSpace(result))
+                    return result;
             }
-            catch (JsonException) { }
         }
         else if (model == ModelConnection.GeminiCli)
         {
-            using var json = JsonDocument.Parse(output);
-            if (json.RootElement.ValueKind != JsonValueKind.Object)
-                throw new InvalidDataException("Gemini CLI 응답 형식을 확인해 주세요.");
+            using var json = ParseEmbeddedObject(output, "Gemini CLI 응답 형식을 확인해 주세요.");
             if (json.RootElement.TryGetProperty("error", out var error) && error.ValueKind is not JsonValueKind.Null)
                 throw Failure(1, error.ToString());
-            if (json.RootElement.TryGetProperty("response", out var response) && response.ValueKind == JsonValueKind.String
-                && !string.IsNullOrWhiteSpace(response.GetString())) return response.GetString()!;
+            if (StringProperty(json.RootElement, "response") is { } response && !string.IsNullOrWhiteSpace(response)) return response;
         }
         else if (model == ModelConnection.CodexCli)
         {
             string? last = null;
             foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
-                using var json = JsonDocument.Parse(line);
-                var root = json.RootElement;
-                if (root.TryGetProperty("type", out var errorType) && errorType.GetString() == "turn.failed")
-                    throw Failure(1, root.ToString());
-                if (root.TryGetProperty("type", out var type) && type.GetString() == "item.completed" &&
-                    root.TryGetProperty("item", out var item) && item.TryGetProperty("type", out var itemType) &&
-                    itemType.GetString() == "agent_message" && item.TryGetProperty("text", out var message))
-                    last = message.GetString();
+                if (!line.StartsWith('{')) continue;
+                JsonDocument json;
+                try { json = JsonDocument.Parse(line); }
+                catch (JsonException) { continue; }
+                using (json)
+                {
+                    var root = json.RootElement;
+                    if (root.ValueKind != JsonValueKind.Object) continue;
+                    var type = StringProperty(root, "type");
+                    if (type == "turn.failed") throw Failure(1, root.ToString());
+                    if (type == "item.completed" && root.TryGetProperty("item", out var item) &&
+                        StringProperty(item, "type") == "agent_message" && StringProperty(item, "text") is { } message)
+                        last = message;
+                }
             }
             if (!string.IsNullOrWhiteSpace(last)) return last;
         }
         throw new InvalidDataException("CLI 응답에 초안 텍스트가 없습니다.");
     }
+
+    static JsonDocument ParseEmbeddedObject(string output, string message)
+    {
+        var start = output.IndexOf('{');
+        var end = output.LastIndexOf('}');
+        if (start < 0 || end < start) throw new InvalidDataException(message);
+        try
+        {
+            var document = JsonDocument.Parse(output.AsMemory(start, end - start + 1));
+            if (document.RootElement.ValueKind == JsonValueKind.Object) return document;
+            document.Dispose();
+        }
+        catch (JsonException) { }
+        throw new InvalidDataException(message);
+    }
+
+    static string? StringProperty(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString() : null;
 
     public static CliFailureKind ClassifyError(string detail)
     {

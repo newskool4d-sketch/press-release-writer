@@ -4,6 +4,18 @@ using PressRelease;
 
 if (await AppServerChecks.RunMockIfRequestedAsync(args)) return;
 if (await ProcessChecks.RunMockIfRequestedAsync(args)) return;
+if (args is ["--sample-form", var sampleOutput])
+{
+    // Writes a filled official form for manual inspection in HWP or a renderer; no model or network is involved.
+    var sample = new PressFormFields("예시교육기관, 학생 75명과 인공지능(AI) 안전 체험 운영",
+        ["예시교육기관(원장 ○○○)은 11월 6일 학생 75명을 대상으로 생활 안전 체험을 운영했다.",
+         "이번 체험은 대피 경로 확인과 안전 수칙 실습 등 참여형 방식으로 진행했다. 학생들은 모둠별로 상황을 정하고 대처 방법을 발표했다.",
+         "예시교육기관은 체험 결과를 바탕으로 참여 학교를 확대할 계획이다."],
+        new DateOnly(2026, 11, 6), "있음", "교학과 교육과정운영팀", "예시교육기관");
+    File.WriteAllBytes(sampleOutput, PressForm.Fill(sample));
+    Console.WriteLine($"PASS: sample form written to {sampleOutput}");
+    return;
+}
 if (args is ["--probe-claude"])
 {
     var probeRoot = Directory.CreateTempSubdirectory("press-release-claude-probe-").FullName;
@@ -103,9 +115,18 @@ try
     {"type":"turn.completed"}
     """;
     Require(Models.ParseReply(ModelConnection.CodexCli, ndjson) == "한글 초안", "Codex JSONL");
+    Require(Models.ParseReply(ModelConnection.CodexCli, "warning: synthetic notice\n" + ndjson + "\n[\"not an object\"]") == "한글 초안",
+        "Codex JSONL tolerates non-JSON and non-object lines");
     Require(Models.ParseReply(ModelConnection.GeminiCli, """{"response":"한글 초안","stats":{}}""") == "한글 초안", "Gemini JSON");
+    Require(Models.ParseReply(ModelConnection.GeminiCli, "Loaded cached credentials.\n" + """{"response":"한글 초안","stats":{}}""" + "\n") == "한글 초안",
+        "Gemini JSON tolerates a notice line before the payload");
+    Require(Models.ParseReply(ModelConnection.ClaudeCli, "notice\n" + """{"type":"result","is_error":false,"result":"한글 초안"}""") == "한글 초안",
+        "Claude JSON tolerates a notice line before the payload");
+    var mixedFooter = $"{Korean}\n\n**{Writing.ReviewNotice}**\n\n{Writing.ReviewQuestion}";
+    Require(Writing.FinalizeDraft(mixedFooter) == Writing.FinalizeDraft(Korean), "footer lines in reverse order are not duplicated");
 
     WritingChecks.Run(Require);
+    GuidelineChecks.Run(Require, dir);
     ProofreadingChecks.Run(Require);
     await GeminiApiChecks.RunAsync(Require);
     await ReleaseUpdaterChecks.RunAsync(dir, Require);

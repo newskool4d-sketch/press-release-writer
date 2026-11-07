@@ -23,6 +23,16 @@ public sealed class StagedUpdate
     internal long Size { get; }
 }
 
+/// <summary>A newer verified release whose executable has not been downloaded yet.</summary>
+public sealed class AvailableUpdate
+{
+    internal AvailableUpdate(ReleaseUpdater.ReleaseAsset asset) => Asset = asset;
+
+    public Version Version => Asset.Version;
+    public long Size => Asset.Size;
+    internal ReleaseUpdater.ReleaseAsset Asset { get; }
+}
+
 public static class ReleaseUpdater
 {
     const string Repository = "newskool4d-sketch/press-release-writer";
@@ -33,6 +43,10 @@ public static class ReleaseUpdater
     const string PartFile = "download.part";
     const long MaxAssetBytes = 512L * 1024 * 1024;
     const int MaxMetadataBytes = 1024 * 1024;
+    static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(20);
+    static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(15);
+    // A stage without a completion marker belongs to a crashed or killed run once it is this old.
+    static readonly TimeSpan OrphanStageAge = TimeSpan.FromHours(24);
 
     public const string ReleasePage = "https://github.com/" + Repository + "/releases/latest";
     internal const string MetadataUrl = "https://api.github.com/repos/" + Repository + "/releases/latest";
@@ -44,15 +58,24 @@ public static class ReleaseUpdater
         PooledConnectionLifetime = TimeSpan.FromMinutes(10)
     }) { Timeout = Timeout.InfiniteTimeSpan };
 
-    public static Task<StagedUpdate?> StageLatestAsync(Version currentVersion, string appFolder, CancellationToken cancel)
-        => StageLatestAsync(Http, currentVersion, appFolder, cancel);
+    /// <summary>Reads release metadata only. The executable is downloaded later by <see cref="StageAsync(AvailableUpdate, string, CancellationToken)"/>.</summary>
+    public static Task<AvailableUpdate?> CheckLatestAsync(Version currentVersion, string appFolder, CancellationToken cancel)
+        => CheckLatestAsync(Http, currentVersion, appFolder, cancel);
+
+    public static Task<StagedUpdate> StageAsync(AvailableUpdate update, string appFolder, CancellationToken cancel)
+        => StageAsync(Http, update, appFolder, cancel);
 
     internal static async Task<StagedUpdate?> StageLatestAsync(HttpClient http, Version currentVersion, string appFolder, CancellationToken cancel)
     {
-        var updates = UpdatesDirectory(appFolder);
-        CleanFinishedStages(updates);
+        var available = await CheckLatestAsync(http, currentVersion, appFolder, cancel).ConfigureAwait(false);
+        return available == null ? null : await StageAsync(http, available, appFolder, cancel).ConfigureAwait(false);
+    }
+
+    internal static async Task<AvailableUpdate?> CheckLatestAsync(HttpClient http, Version currentVersion, string appFolder, CancellationToken cancel)
+    {
+        CleanStaleStages(UpdatesDirectory(appFolder));
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-        limit.CancelAfter(TimeSpan.FromMinutes(3));
+        limit.CancelAfter(MetadataTimeout);
         try
         {
             using var request = NewGet(new Uri(MetadataUrl));
@@ -66,8 +89,30 @@ public static class ReleaseUpdater
             await using var stream = await response.Content.ReadAsStreamAsync(limit.Token).ConfigureAwait(false);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: limit.Token).ConfigureAwait(false);
             var release = SelectRelease(document.RootElement, currentVersion);
-            if (release == null) return null;
+            return release == null ? null : new AvailableUpdate(release);
+        }
+        catch (OperationCanceledException) when (!cancel.IsCancellationRequested)
+        {
+            throw new TimeoutException("자동 업데이트 확인 시간이 초과됐습니다.");
+        }
+        catch (HttpRequestException)
+        {
+            throw new IOException("GitHub 자동 업데이트에 연결하지 못했습니다.");
+        }
+        catch (JsonException)
+        {
+            throw new InvalidDataException("GitHub 릴리스 정보 형식이 올바르지 않습니다.");
+        }
+    }
 
+    internal static async Task<StagedUpdate> StageAsync(HttpClient http, AvailableUpdate update, string appFolder, CancellationToken cancel)
+    {
+        var release = update.Asset;
+        var updates = UpdatesDirectory(appFolder);
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        limit.CancelAfter(DownloadTimeout);
+        try
+        {
             Directory.CreateDirectory(updates);
             RequireRegularPath(updates);
             var stage = Directory.CreateDirectory(Path.Combine(updates, StagePrefix + Guid.NewGuid().ToString("N"))).FullName;
@@ -89,15 +134,11 @@ public static class ReleaseUpdater
         }
         catch (OperationCanceledException) when (!cancel.IsCancellationRequested)
         {
-            throw new TimeoutException("자동 업데이트 확인 시간이 초과됐습니다.");
+            throw new TimeoutException("업데이트 파일 내려받기 시간이 초과됐습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.");
         }
         catch (HttpRequestException)
         {
-            throw new IOException("GitHub 자동 업데이트에 연결하지 못했습니다.");
-        }
-        catch (JsonException)
-        {
-            throw new InvalidDataException("GitHub 릴리스 정보 형식이 올바르지 않습니다.");
+            throw new IOException("GitHub 업데이트 파일을 내려받지 못했습니다.");
         }
     }
 
@@ -279,6 +320,7 @@ public static class ReleaseUpdater
                 if (!File.Exists(target) && File.Exists(backup)) File.Move(backup, target);
                 throw;
             }
+            PruneBackups(target, backup);
             return true;
         }
         finally
@@ -303,12 +345,49 @@ public static class ReleaseUpdater
         return name[StagePrefix.Length..];
     }
 
-    static void CleanFinishedStages(string updates)
+    // Only the newest backup is kept. Older ones from earlier updates are removed after a successful replace.
+    static void PruneBackups(string target, string keep)
+    {
+        var directory = Path.GetDirectoryName(target);
+        if (directory == null) return;
+        try
+        {
+            foreach (var backup in Directory.EnumerateFiles(directory, Path.GetFileName(target) + ".previous-*.bak"))
+                if (!SamePath(backup, keep)) TryDelete(backup);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+    }
+
+    static void CleanStaleStages(string updates)
     {
         if (!Directory.Exists(updates)) return;
         RequireRegularPath(updates);
+        var cutoff = DateTime.UtcNow - OrphanStageAge;
         foreach (var stage in Directory.EnumerateDirectories(updates, StagePrefix + "*"))
-            if (IsStageName(Path.GetFileName(stage)) && File.Exists(Path.Combine(stage, FinishedFile))) CleanStage(stage);
+        {
+            if (!IsStageName(Path.GetFileName(stage))) continue;
+            // A finished helper leaves a marker. A marker-less stage from a crashed or killed run is removed once it is old;
+            // the age guard protects a stage another live instance has just prepared.
+            if (File.Exists(Path.Combine(stage, FinishedFile)) || StageTime(stage) < cutoff) CleanStage(stage);
+        }
+    }
+
+    static DateTime StageTime(string stage)
+    {
+        try
+        {
+            var latest = Directory.GetLastWriteTimeUtc(stage);
+            foreach (var file in Directory.EnumerateFiles(stage))
+            {
+                var written = File.GetLastWriteTimeUtc(file);
+                if (written > latest) latest = written;
+            }
+            return latest;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return DateTime.UtcNow; // Treat an unreadable stage as fresh; it is retried on a later launch.
+        }
     }
 
     static void CleanStage(string stage)

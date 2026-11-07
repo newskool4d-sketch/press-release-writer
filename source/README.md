@@ -1,8 +1,8 @@
-# 인천교육 보도자료 작성기 MVP 0.1.12
+# 인천교육 보도자료 작성기 MVP 0.1.13
 
 Windows 11 x64용 로컬 WPF 앱입니다. 상단 **설정 → AI 연결**에서 Claude Code, Codex, Gemini의 상태 및 외부 AI 전송 동의를 관리합니다. **설정 → 화면 설정**에서 라이트·다크 모드와 11~20포인트 글자 크기를 선택합니다. 원자료와 초안 사이 구분선을 끌어 폭을 조절할 수 있습니다.
 
-사용 절차는 [0.1.12 사용 안내](../사용안내_v0.1.12.md)를 참고하세요. 실행 파일 아이콘과 화면 도안은 `Desktop/Assets`에 포함돼 있습니다.
+사용 절차는 [0.1.13 사용 안내](../사용안내_v0.1.13.md)를 참고하세요. 실행 파일 아이콘과 화면 도안은 `Desktop/Assets`에 포함돼 있습니다.
 
 상단 **도움말 → 사용 안내**는 앱에 포함된 HTML 안내서를 기본 브라우저로 엽니다. 인터넷 없이 읽을 수 있으며 안내서에서 라이트·다크 모드와 글자 크기를 조절할 수 있습니다. 안내 파일은 앱 데이터 폴더의 `help`에 추출되고 앱을 업데이트하면 포함된 내용으로 갱신됩니다.
 
@@ -27,7 +27,7 @@ Windows 11 x64용 로컬 WPF 앱입니다. 상단 **설정 → AI 연결**에서
 - 앱은 분량·리드 길이·첫 인공지능(AI) 표기를 검사합니다. 사실 확인·반려 판단·휴일 예외는 제공 자료와 담당자 확인이 필요합니다.
 - 원자료나 확인 정보를 수정한 뒤 닫으면 확인창을 표시합니다. 작업 중 종료는 취소·프로세스 정리를 기다립니다. 원자료는 자동 저장하지 않습니다.
 - 맞춤법 메뉴는 현재 초안에서 오타·띄어쓰기 수정안을 요청합니다. 원문에 유일하게 대응하는 수정 구간만 수용하고 숫자·직접 인용 변경을 거부합니다. 수정 전후를 확인한 뒤 적용하며 Ctrl+Z로 되돌릴 수 있습니다.
-- TXT·MD·HWPX·텍스트 PDF를 입력하고 TXT·MD로 저장합니다. 파일 25MB, PDF 100쪽, 원자료 50,000자 제한과 저장 이름 충돌 회피를 유지합니다.
+- TXT·MD·HWPX·텍스트 PDF를 입력하고 TXT·MD와 공식 양식 HWPX로 저장합니다. 양식은 `Core/Assets/press-release-form.hwpx`(인천광역시교육청 보도자료 양식)를 내장해 머리말과 본문 자리만 바꿉니다. 파일 25MB, PDF 100쪽, 원자료 50,000자 제한과 저장 이름 충돌 회피를 유지합니다.
 
 ## 소스 구성
 
@@ -47,7 +47,7 @@ Windows 11 x64용 로컬 WPF 앱입니다. 상단 **설정 → AI 연결**에서
 
 시스템 SDK가 있으면 `-DotnetPath`를 생략할 수 있습니다. NuGet 패키지 복원에는 네트워크가 필요합니다. 검증 스크립트는 SDK 상태·패키지를 프로젝트 `.tools`에 두고 SDK의 개발용 인증서 자동 생성을 끕니다.
 
-`-ProbeCodex`는 설치된 공식 CLI를 빈 앱 전용 `CODEX_HOME`으로 실행해 초기 연결과 미로그인 계정 조회를 검사합니다. `-Publish`는 런타임을 포함한 x64 단일 실행 파일과 고지·사용 안내를 `artifacts/v0.1.12/portable`에 만듭니다.
+`-ProbeCodex`는 설치된 공식 CLI를 빈 앱 전용 `CODEX_HOME`으로 실행해 초기 연결과 미로그인 계정 조회를 검사합니다. `-Publish`는 런타임을 포함한 x64 단일 실행 파일과 고지·사용 안내를 `artifacts/v0.1.13/portable`에 만듭니다.
 
 선택한 한글 PDF의 추출 검사는 별도로 실행할 수 있습니다.
 
@@ -60,14 +60,14 @@ PDF를 제공하지 않으면 PDF 항목은 통과로 처리하지 않고 SKIP�
 NSIS 설치 패키지는 필요할 때 별도로 빌드합니다. 경로는 절대 경로를 권장합니다.
 
 ```powershell
-makensis /DVERSION=0.1.12 /DOUTPUT=C:\출력\PressReleaseWriter_Setup_v0.1.12.exe /DPAYLOAD=C:\프로젝트\artifacts\v0.1.12\portable .\source\packaging\Setup.nsi
+makensis /DVERSION=0.1.13 /DOUTPUT=C:\출력\PressReleaseWriter_Setup_v0.1.13.exe /DPAYLOAD=C:\프로젝트\artifacts\v0.1.13\portable .\source\packaging\Setup.nsi
 ```
 
 ## 공개 배포와 자동 업데이트
 
 공개 배포 저장소는 [newskool4d-sketch/press-release-writer](https://github.com/newskool4d-sketch/press-release-writer/releases/latest)입니다. 새 버전은 `Desktop.csproj`의 버전을 올려 검증·빌드한 뒤 `source/packaging/Package-GitHubRelease.ps1`로 ZIP과 자산 해시를 만듭니다. 정식 `vX.Y.Z` 릴리스에 `PressReleaseWriter.exe`와 `PressReleaseWriter-win-x64.zip`을 올리고, 자산 해시를 확인한 뒤 공개합니다. 이미 공개한 버전의 실행 파일을 교체할 때는 버전 번호를 올려 새 릴리스로 게시합니다.
 
-앱은 정식 최신 릴리스의 실행 파일 이름, 크기, SHA-256과 제품 버전을 확인하고 정상 종료할 때 실행 파일을 교체합니다. 파일 교체는 쓰기 가능한 휴대용 폴더에서 동작하며 이전 파일을 백업합니다. `source/packaging/Test-PortableUpdate.ps1`은 이전·새 실행 파일을 별도 폴더에 복사해 교체와 재실행을 검증합니다.
+앱은 시작할 때 정식 최신 릴리스 정보만 확인하고, 사용자가 **vX.Y.Z 내려받기**를 누르면 실행 파일 이름, 크기, SHA-256과 제품 버전을 확인한 뒤 정상 종료할 때 실행 파일을 교체합니다. Windows 종료·로그오프 중에는 준비된 파일을 적용하지 않고 폐기합니다. 파일 교체는 쓰기 가능한 휴대용 폴더에서 동작하며 가장 최근 이전 파일 하나만 백업으로 남깁니다. `source/packaging/Test-PortableUpdate.ps1`은 이전·새 실행 파일을 별도 폴더에 복사해 교체와 재실행을 검증합니다.
 
 ## 공식 참고 자료
 
