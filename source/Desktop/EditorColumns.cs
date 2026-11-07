@@ -8,27 +8,39 @@ namespace PressReleaseDesktop;
 sealed class EditorColumns : Grid
 {
     const double EditorWeight = 2.6;
+    const double ReviewMinWidth = 144;
     public const double DefaultSourceShare = 1.1 / EditorWeight;
 
     readonly ColumnDefinition sourceColumn;
     readonly ColumnDefinition draftColumn;
+    readonly ColumnDefinition reviewColumn;
+    readonly FrameworkElement review;
+    readonly FrameworkElement reviewStrip;
+    GridLength reviewWidth = Star(.8);
 
-    public EditorColumns(FrameworkElement source, FrameworkElement draft, FrameworkElement review,
-        double sourceShare, Action<double> onShareChanged)
+    public EditorColumns(FrameworkElement source, FrameworkElement draft, FrameworkElement review, FrameworkElement reviewStrip,
+        double sourceShare, bool reviewVisible, Action<double> onShareChanged)
     {
         if (!double.IsFinite(sourceShare) || sourceShare <= 0 || sourceShare >= 1)
             sourceShare = DefaultSourceShare;
+        this.review = review;
+        this.reviewStrip = reviewStrip;
 
         sourceColumn = new ColumnDefinition { Width = Star(EditorWeight * sourceShare), MinWidth = 156 };
         draftColumn = new ColumnDefinition { Width = Star(EditorWeight * (1 - sourceShare)), MinWidth = 190 };
+        reviewColumn = new ColumnDefinition { Width = reviewWidth, MinWidth = ReviewMinWidth };
         ColumnDefinitions.Add(sourceColumn);
         ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
         ColumnDefinitions.Add(draftColumn);
-        ColumnDefinitions.Add(new ColumnDefinition { Width = Star(.8), MinWidth = 144 });
+        ColumnDefinitions.Add(reviewColumn);
 
         Add(source, 0);
         Add(draft, 2);
         Add(review, 3);
+        reviewStrip.HorizontalAlignment = HorizontalAlignment.Left;
+        Add(reviewStrip, 3);
+        ReviewVisible = true;
+        SetReviewVisible(reviewVisible);
 
         var divider = new GridSplitter
         {
@@ -51,9 +63,19 @@ sealed class EditorColumns : Grid
         Add(divider, 1);
 
         var savedShare = SourceShare;
+        IInputElement? focusBeforeDrag = null;
+        divider.PreviewMouseLeftButtonDown += (_, _) =>
+            focusBeforeDrag = Keyboard.FocusedElement is { } focused && !ReferenceEquals(focused, divider) ? focused : null;
         divider.DragCompleted += (_, e) =>
         {
             if (!e.Canceled) PublishShare();
+            // A mouse drag must not leave the divider focused: arrow keys pressed afterwards would keep moving it.
+            if (divider.IsKeyboardFocused)
+            {
+                if (focusBeforeDrag is UIElement { IsVisible: true, Focusable: true } previous) Keyboard.Focus(previous);
+                else Keyboard.ClearFocus();
+            }
+            focusBeforeDrag = null;
         };
         divider.KeyUp += (_, e) =>
         {
@@ -74,6 +96,28 @@ sealed class EditorColumns : Grid
     }
 
     public double SourceShare => sourceColumn.Width.Value / (sourceColumn.Width.Value + draftColumn.Width.Value);
+
+    public bool ReviewVisible { get; private set; }
+
+    /// <summary>Collapses the review column to a slim strip or restores the width it had before collapsing.</summary>
+    public void SetReviewVisible(bool visible)
+    {
+        if (visible == ReviewVisible) return;
+        ReviewVisible = visible;
+        if (visible)
+        {
+            reviewColumn.MinWidth = ReviewMinWidth;
+            reviewColumn.Width = reviewWidth;
+        }
+        else
+        {
+            reviewWidth = reviewColumn.Width;
+            reviewColumn.MinWidth = 0;
+            reviewColumn.Width = GridLength.Auto;
+        }
+        review.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        reviewStrip.Visibility = visible ? Visibility.Collapsed : Visibility.Visible;
+    }
 
     static GridLength Star(double value) => new(value, GridUnitType.Star);
 

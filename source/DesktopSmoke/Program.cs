@@ -416,6 +416,21 @@ static class Program
         Drag(-32);
         Require(Near(columns.ColumnDefinitions[0].ActualWidth, sourceWidth + 32, 2) &&
             Near(columns.ColumnDefinitions[2].ActualWidth, draftWidth - 32, 2), "native splitter drag also widens the draft in the opposite direction");
+        // The review column folds into a slim strip and hands its width to the editors; unfolding restores the old widths.
+        var review = (FrameworkElement)columns.Children[2];
+        var reviewStrip = (FrameworkElement)columns.Children[3];
+        Field<Button>(window, "reviewHide").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Arrange(1264, 791, "review-collapsed.png");
+        Require(!columns.ReviewVisible && review.Visibility == Visibility.Collapsed && reviewStrip.Visibility == Visibility.Visible &&
+            columns.ColumnDefinitions[3].ActualWidth < 60 && columns.ColumnDefinitions[2].ActualWidth > draftWidth - 32 + 80,
+            $"hiding the review column hands its width to the editors ({columns.ColumnDefinitions[3].ActualWidth:F0} DIP strip)");
+        Field<Button>(window, "reviewShow").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Arrange(1264, 791);
+        Require(columns.ReviewVisible && review.Visibility == Visibility.Visible && reviewStrip.Visibility == Visibility.Collapsed &&
+            Near(columns.ColumnDefinitions[3].ActualWidth, reviewWidth, 2) && Near(columns.ColumnDefinitions[0].ActualWidth, sourceWidth + 32, 2),
+            "showing the review column restores the previous widths");
+        Field<Button>(window, "reviewHide").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Arrange(1264, 791);
         var chosenShare = columns.SourceShare;
         CloseAndWait(window);
 
@@ -424,10 +439,10 @@ static class Program
         var restoredColumns = Field<EditorColumns>(restored, "columns");
         Arrange(1264, 791, target: DetachSurface(restored, restoredAppearance));
         Require(restoredAppearance.IsDark && Near(restoredAppearance.FontPoints, 15.7) &&
-            Near(restoredColumns.SourceShare, chosenShare) &&
+            Near(restoredColumns.SourceShare, chosenShare) && !restoredColumns.ReviewVisible && restoredColumns.ColumnDefinitions[3].ActualWidth < 60 &&
             Near(restoredColumns.ColumnDefinitions[0].ActualWidth, columns.ColumnDefinitions[0].ActualWidth, 2) &&
             Near(restoredColumns.ColumnDefinitions[2].ActualWidth, columns.ColumnDefinitions[2].ActualWidth, 2),
-            "reopening restores dark mode, fractional point size, and actual editor widths");
+            "reopening restores dark mode, fractional point size, the folded review column, and actual editor widths");
         CloseAndWait(restored);
     }
 

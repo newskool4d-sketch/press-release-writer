@@ -65,6 +65,7 @@ sealed class MainWindow : Window
     readonly ComboBox[] rejections = Writing.RejectionReasons
         .Select(_ => new ComboBox { ItemsSource = Writing.RejectionStatuses, SelectedIndex = 2 }).ToArray();
     readonly TextBlock conditionChecks = Caption("");
+    Button reviewHide = null!, reviewShow = null!;
     readonly TextBlock status = Caption("AI 연결을 선택하고 원자료를 입력해 주세요.");
     readonly Border statusBar = new() { CornerRadius = new(4), Padding = new(10, 5, 10, 5) };
     readonly CheckBox saveTxt = new() { Content = "TXT", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
@@ -218,7 +219,7 @@ sealed class MainWindow : Window
         toolbar.SetResourceReference(Border.BorderBrushProperty, "GlassLine");
         Place(root, toolbar, 1);
 
-        columns = new EditorColumns(SourcePanel(), DraftPanel(), ReviewPanel(), settings.SourceShare, _ => Persist());
+        columns = new EditorColumns(SourcePanel(), DraftPanel(), ReviewPanel(), ReviewStrip(), settings.SourceShare, settings.ReviewVisible, _ => Persist());
         Place(root, columns, 2);
 
         var bottom = new StackPanel { Margin = new(0, 10, 0, 0) };
@@ -779,7 +780,19 @@ sealed class MainWindow : Window
     FrameworkElement ReviewPanel()
     {
         var panel = GridRows("auto", "*");
-        Place(panel, Heading("검토"), 0);
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition());
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(Heading("검토"));
+        reviewHide = Action("숨기기", () => SetReviewVisible(false), lockWhileBusy: false);
+        reviewHide.ToolTip = "검토 칸을 접어 편집 공간을 넓힙니다. 오른쪽 가장자리의 ‘검토 보기’로 다시 폅니다.";
+        reviewHide.Padding = new(8, 2, 8, 2);
+        reviewHide.Margin = new(8, 0, 0, 8);
+        reviewHide.VerticalAlignment = VerticalAlignment.Top;
+        System.Windows.Automation.AutomationProperties.SetName(reviewHide, "검토 칸 숨기기");
+        Grid.SetColumn(reviewHide, 1);
+        header.Children.Add(reviewHide);
+        Place(panel, header, 0);
         var content = new StackPanel();
         content.SetResourceReference(System.Windows.Documents.TextElement.FontSizeProperty, "WorkspaceSmallSize");
         var checksBlock = new Border
@@ -799,6 +812,24 @@ sealed class MainWindow : Window
         var surface = Card(panel, new Thickness(0), padding: 0);
         surface.Padding = new(0, 12, 0, 0);
         return surface;
+    }
+
+    FrameworkElement ReviewStrip()
+    {
+        reviewShow = Action("검토 보기", () => SetReviewVisible(true), lockWhileBusy: false);
+        reviewShow.Content = new TextBlock { Text = "검토 보기", LayoutTransform = new RotateTransform(90) };
+        reviewShow.ToolTip = "접어 둔 검토 칸을 다시 폅니다.";
+        reviewShow.Padding = new(3, 10, 3, 10);
+        reviewShow.Margin = new(6, 10, 0, 0);
+        reviewShow.VerticalAlignment = VerticalAlignment.Top;
+        System.Windows.Automation.AutomationProperties.SetName(reviewShow, "검토 칸 보이기");
+        return reviewShow;
+    }
+
+    void SetReviewVisible(bool visible)
+    {
+        columns.SetReviewVisible(visible);
+        Persist();
     }
 
     async void LoadSource()
@@ -1071,7 +1102,7 @@ sealed class MainWindow : Window
         if (!ready) return;
         RunUi(() => File.WriteAllText(Path.Combine(appFolder, "settings.json"), JsonSerializer.Serialize(
             new Options(folder, Selected, googleProject, appearance.IsDark, appearance.FontPoints, columns.SourceShare,
-                string.IsNullOrWhiteSpace(department.Text) ? null : department.Text.Trim()))));
+                string.IsNullOrWhiteSpace(department.Text) ? null : department.Text.Trim(), columns.ReviewVisible))));
     }
 
     Button Action(string title, Action action, string? style = null, bool lockWhileBusy = true)
@@ -1235,7 +1266,7 @@ sealed class MainWindow : Window
 
     sealed record Options(string? Folder = null, ModelConnection Model = ModelConnection.CodexCli, string? GoogleProject = null,
         bool DarkMode = false, double FontPoints = WorkspaceAppearance.DefaultFontPoints, double SourceShare = EditorColumns.DefaultSourceShare,
-        string? Department = null);
+        string? Department = null, bool ReviewVisible = true);
     sealed record ModelItem(ModelConnection Connection)
     {
         public override string ToString() => Models.Label(Connection);

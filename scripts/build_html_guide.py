@@ -1,4 +1,4 @@
-"""Build the offline v0.1.14 guide from public-safe, synthetic screenshots."""
+"""Build the offline v0.1.15 guide from public-safe, synthetic screenshots."""
 from pathlib import Path
 import base64
 import hashlib
@@ -16,9 +16,9 @@ HTML = r'''<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="인천교육 보도자료 작성기 v0.1.14 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
+  <meta name="description" content="인천교육 보도자료 작성기 v0.1.15 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-@@SCRIPTHASH@@'; base-uri 'none'; form-action 'none'">
-  <title>인천교육 보도자료 작성기 · v0.1.14 사용 안내</title>
+  <title>인천교육 보도자료 작성기 · v0.1.15 사용 안내</title>
   <style>
     :root { color-scheme: light; --paper:#fbfaf7; --ink:#253735; --muted:#526560; --line:#d6dfd9; --accent:#226c65; --wash:#edf4ef; }
     * { box-sizing:border-box; }
@@ -128,7 +128,7 @@ HTML = r'''<!doctype html>
 <a class="skip" href="#main">본문으로 이동</a>
 <header class="mast">
   <img src="@@CI@@" alt="인천광역시교육청" width="1271" height="335">
-  <p>보도자료 작성기<br>사용 안내 · v0.1.14</p>
+  <p>보도자료 작성기<br>사용 안내 · v0.1.15</p>
 </header>
 <div class="layout">
 <nav aria-label="사용 안내 목차">
@@ -145,7 +145,7 @@ HTML = r'''<!doctype html>
   </ol>
 </nav>
 <main id="main">
-<div class="version">인천교육 보도자료 작성기 · v0.1.14</div>
+<div class="version">인천교육 보도자료 작성기 · v0.1.15</div>
 <div class="reading-tools" role="group" aria-label="안내서 보기 설정" hidden>
   <label for="guide-theme">화면 <select id="guide-theme"><option value="light">라이트 모드</option><option value="dark">다크 모드</option></select></label>
   <label for="guide-size">글자 크기 <input id="guide-size" type="range" min="14" max="22" step="1" value="16"><output id="guide-size-value" for="guide-size" aria-live="polite">16px</output></label>
@@ -164,7 +164,7 @@ HTML = r'''<!doctype html>
 
 <section id="start">
   <h2><small>01</small>처음 시작하기</h2>
-  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.14">v0.1.14 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
+  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.15">v0.1.15 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
   <p>현재 배포본은 서명되지 않은 Windows x64용입니다. 실행 전 배포 저장소와 파일 출처를 확인하세요.</p>
   <ol class="quick">
     <li><strong>AI 연결</strong><a href="#connect">설정 → AI 연결</a>에서 로그인 또는 API 키 연결을 마칩니다.</li>
@@ -257,7 +257,7 @@ HTML = r'''<!doctype html>
   <h2><small>06</small>화면을 편하게 조절하기</h2>
   <p><strong>설정 → 화면 설정</strong>에서 <strong>라이트 모드</strong> 또는 <strong>다크 모드</strong>를 선택합니다. 글자 크기는 <strong>11~20포인트</strong>를 0.1포인트 단위로 조절하며 화면에 바로 반영됩니다.</p>
   <ul>
-    <li>원자료와 초안 사이의 구분선을 끌어 입력칸 폭을 조절합니다. 구분선에 키보드 포커스를 둔 뒤 좌우 방향키를 사용할 수도 있습니다.</li>
+    <li>원자료와 초안 사이의 구분선을 끌어 입력칸 폭을 조절합니다. 구분선에 키보드 포커스를 둔 뒤 좌우 방향키를 사용할 수도 있습니다. 검토 칸은 머리글의 <strong>숨기기</strong>로 접고 오른쪽 가장자리의 <strong>검토 보기</strong>로 다시 폅니다. 접힘 상태는 다시 열었을 때 복원됩니다. 구분선을 마우스로 끈 뒤에는 포커스가 이전 입력칸으로 돌아가므로 방향키가 구분선을 움직이지 않습니다.</li>
     <li>글자 크기가 <strong>17포인트 이상</strong>이면 작업 버튼이 <strong>원자료 ▾</strong>와 <strong>초안 ▾</strong> 메뉴로 묶입니다. 작성 조건 탭은 <strong>조건</strong>으로 짧게 표시될 수 있습니다.</li>
     <li>화면 모드·글자 크기·편집 폭은 다시 실행했을 때 복원됩니다.</li>
   </ul>
@@ -302,7 +302,7 @@ HTML = r'''<!doctype html>
   </details>
 </section>
 <footer>
-  <p>인천교육 보도자료 작성기 v0.1.14 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.14">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
+  <p>인천교육 보도자료 작성기 v0.1.15 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.15">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
   <p>이 HTML은 그림·스타일을 포함하므로 내려받아 브라우저에서 바로 열 수 있습니다. 외부 링크와 AI 서비스 이용에는 인터넷 연결이 필요합니다. 화면 예시는 가상 자료이며 실제 보도자료가 아닙니다.</p>
 </footer>
 </main>
@@ -348,8 +348,8 @@ HTML = HTML.replace("@@PROOFREAD@@", data_uri(SHOTS / "proofreading.png", "image
 script = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
 HTML = HTML.replace("@@SCRIPTHASH@@", base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
 payload = HTML.encode("utf-8")
-local = ROOT / "사용안내_v0.1.14.html"
-release = ROOT / "artifacts/v0.1.14/release/PressReleaseWriter-Guide-ko.html"
+local = ROOT / "사용안내_v0.1.15.html"
+release = ROOT / "artifacts/v0.1.15/release/PressReleaseWriter-Guide-ko.html"
 release.parent.mkdir(parents=True, exist_ok=True)
 local.write_bytes(payload)
 release.write_bytes(payload)
