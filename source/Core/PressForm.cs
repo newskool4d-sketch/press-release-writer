@@ -70,6 +70,8 @@ public static class PressForm
             text = ReplaceOnce(text, "<hp:t>  월  일(요일)</hp:t>", $"<hp:t> {Escape(Timeliness.PressDate(date))}</hp:t>");
             text = ReplaceOnce(text, "<hp:t>제공일: 2024. 10. 11.(금)</hp:t>", $"<hp:t>제공일: {Escape(Timeliness.OfficialDate(date))}</hp:t>");
         }
+        // Without a date the form's sample date would read as a real one, so it becomes a blank like the other placeholders.
+        else text = ReplaceOnce(text, "<hp:t>제공일: 2024. 10. 11.(금)</hp:t>", "<hp:t>제공일:     .   .   .(요일)</hp:t>");
         if (fields.Photo is "있음" or "없음")
             text = ReplaceOnce(text, "<hp:t> (있음 / 없음) - </hp:t>", $"<hp:t> ({fields.Photo}) - </hp:t>");
         if (!string.IsNullOrWhiteSpace(fields.Department))
@@ -118,7 +120,8 @@ public static class PressForm
         return index < 0 ? text : string.Concat(text.AsSpan(0, index), newValue, text.AsSpan(index + oldValue.Length));
     }
 
-    static string OneLine(string value) => Regex.Replace(value.Trim(), @"\s*[\r\n]+\s*", " ");
+    // A raw tab inside <hp:t> makes HWP drop the text that follows it, so tabs become plain spaces.
+    static string OneLine(string value) => Regex.Replace(value.Replace('\t', ' ').Trim(), @"\s*[\r\n]+\s*", " ");
 
     static string Escape(string value) => SecurityElement.Escape(value);
 }

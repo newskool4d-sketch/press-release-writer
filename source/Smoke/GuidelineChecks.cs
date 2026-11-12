@@ -107,6 +107,14 @@ public static class GuidelineChecks
         var minimalText = SourceFiles.Read(Path.Combine(directory, "최소.hwpx")).Text;
         require(minimalText.Contains("제목 <A&B>") && minimalText.Contains("본문 한 문단") && minimalText.Contains("월  일(요일)") &&
             minimalText.Contains("(있음 / 없음)") && minimalText.Contains("0000과 0000팀"), "form/unknown header values keep the placeholders for the officer");
+        require(minimalText.Contains("제공일:     .   .   .(요일)") && !minimalText.Contains("2024. 10. 11."), "form/missing date leaves a blank 제공일 instead of the sample date");
+        File.WriteAllBytes(Path.Combine(directory, "탭.hwpx"), PressForm.Fill(new PressFormFields("제목\t탭", ["앞\t뒤 글자"], Department: "교학과\t팀")));
+        var tabSection = ReadEntry(Path.Combine(directory, "탭.hwpx"), "Contents/section0.xml");
+        require(!tabSection.Contains('\t') && tabSection.Contains("제목 탭") && tabSection.Contains("앞 뒤 글자") && tabSection.Contains("교학과 팀"),
+            "form/tabs become spaces so HWP keeps the text after them");
+        var metadata = ReadEntry(hwpx, "Contents/content.hpf");
+        require(metadata.Contains("name=\"creator\" content=\"text\">인천광역시교육청<") && metadata.Contains("name=\"lastsaveby\" content=\"text\">인천광역시교육청<") &&
+            !metadata.Contains("서울특별시교육청"), "form/file properties carry the institution instead of personal names");
         require(Throws<InvalidDataException>(() => Writing.FormFields("## 보도자료 초안\n\n작성 보류\n\n사유", context)) &&
             Throws<InvalidDataException>(() => Writing.FormFields("리드문만 있음", context)) &&
             Throws<InvalidDataException>(() => PressForm.Fill(new PressFormFields(" ", ["본문"]))), "form/held or unstructured drafts are refused");
