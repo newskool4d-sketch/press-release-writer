@@ -1,9 +1,10 @@
-"""Build the offline v0.1.19 guide from public-safe, synthetic screenshots."""
+"""Build the shared offline guide from public-safe, synthetic screenshots."""
 from pathlib import Path
 import base64
 import hashlib
 import json
 import re
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parent.parent
 SHOTS = ROOT / "docs/images"
@@ -16,9 +17,9 @@ HTML = r'''<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="인천교육 보도자료 작성기 v0.1.19 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
+  <meta name="description" content="인천교육 보도자료 작성기 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD·HWPX 저장 방법.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-@@SCRIPTHASH@@'; base-uri 'none'; form-action 'none'">
-  <title>인천교육 보도자료 작성기 · v0.1.19 사용 안내</title>
+  <title>인천교육 보도자료 작성기 · 사용 안내</title>
   <style>
     :root { color-scheme: light; --paper:#fbfaf7; --ink:#253735; --muted:#526560; --line:#d6dfd9; --accent:#226c65; --wash:#edf4ef; }
     * { box-sizing:border-box; }
@@ -128,7 +129,7 @@ HTML = r'''<!doctype html>
 <a class="skip" href="#main">본문으로 이동</a>
 <header class="mast">
   <img src="@@CI@@" alt="인천광역시교육청" width="1271" height="335">
-  <p>보도자료 작성기<br>사용 안내 · v0.1.19</p>
+  <p>보도자료 작성기<br>사용 안내</p>
 </header>
 <div class="layout">
 <nav aria-label="사용 안내 목차">
@@ -138,14 +139,14 @@ HTML = r'''<!doctype html>
     <li><a href="#connect">02 AI 연결하기</a></li>
     <li><a href="#source">03 원자료 입력하기</a></li>
     <li><a href="#draft">04 초안과 맞춤법</a></li>
-    <li><a href="#save">05 TXT·MD 저장</a></li>
+    <li><a href="#save">05 TXT·MD·HWPX 저장</a></li>
     <li><a href="#display">06 화면 설정</a></li>
     <li><a href="#update">07 자동 업데이트</a></li>
     <li><a href="#help">08 문제 해결</a></li>
   </ol>
 </nav>
 <main id="main">
-<div class="version">인천교육 보도자료 작성기 · v0.1.19</div>
+<div class="version">인천교육 보도자료 작성기</div>
 <div class="reading-tools" role="group" aria-label="안내서 보기 설정" hidden>
   <label for="guide-theme">화면 <select id="guide-theme"><option value="light">라이트 모드</option><option value="dark">다크 모드</option></select></label>
   <label for="guide-size">글자 크기 <input id="guide-size" type="range" min="14" max="22" step="1" value="16"><output id="guide-size-value" for="guide-size" aria-live="polite">16px</output></label>
@@ -155,8 +156,8 @@ HTML = r'''<!doctype html>
 <noscript><p>화면 모드와 글자 조절은 브라우저의 JavaScript 허용이 필요합니다. 본문은 그대로 읽을 수 있습니다.</p></noscript>
 <h1>자료를 넣고,<br>검토한 초안을 저장하세요.</h1>
 <p class="intro">처음 실행부터 AI 연결, 초안 작성, 맞춤법 검사와 저장까지 순서대로 안내합니다. 화면의 버튼 이름을 기준으로 따라 하세요.</p>
-<p><strong>앱에서 열기:</strong> 상단 <strong>도움말 → 사용 안내</strong>를 선택하면 이 안내서가 기본 브라우저에서 열립니다. 인터넷 연결 없이 읽을 수 있습니다.</p>
-<p class="meta">Windows x64용 · 안내 기준 2026년 11월 7일 · 그림이 포함된 단일 HTML 파일</p>
+<p><strong>앱에서 열기:</strong> 상단 <strong>도움말 → 사용 안내</strong>를 선택하면 설치본에 포함된 안내서가 기본 브라우저에서 열립니다. 최신 공통 안내서는 릴리스에서 내려받을 수 있으며, 내려받은 뒤에는 인터넷 연결 없이 읽을 수 있습니다.</p>
+<p class="meta">Windows x64용 · 2026년 11월 14일 갱신 · 그림이 포함된 단일 HTML 파일</p>
 <figure>
   <img src="@@WORKSPACE@@" alt="보도자료 작성기 화면. 상단 AI 선택과 설정, 왼쪽 원자료, 가운데 초안 작성·편집, 오른쪽 검토, 하단 저장 도구가 배치되어 있다." width="1264" height="791">
   <figcaption>화면 예시 — 입력 내용과 초안은 화면 검증용 가상 자료입니다. 실제 원고와 연결 상태는 사용자 환경에 따라 달라집니다.</figcaption>
@@ -164,7 +165,7 @@ HTML = r'''<!doctype html>
 
 <section id="start">
   <h2><small>01</small>처음 시작하기</h2>
-  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.19">v0.1.19 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
+  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/latest">최신 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
   <p>현재 배포본은 서명되지 않은 Windows x64용입니다. 실행 전 배포 저장소와 파일 출처를 확인하세요.</p>
   <ol class="quick">
     <li><strong>AI 연결</strong><a href="#connect">설정 → AI 연결</a>에서 로그인 또는 API 키 연결을 마칩니다.</li>
@@ -219,6 +220,7 @@ HTML = r'''<!doctype html>
   <h3>파일 열기와 끌어놓기</h3>
   <p><strong>파일 열기</strong>로 TXT·MD·HWPX·텍스트 PDF를 선택하거나, 파일 탐색기의 파일을 <strong>원문 입력칸</strong>으로 끌어다 놓습니다. 텍스트는 직접 붙여넣을 수도 있습니다. HWPX는 문단·표·글상자·각주의 글을 읽고, 숨은 설명과 메모는 읽지 않습니다.</p>
   <p>파일을 넣은 뒤 추출된 내용을 확인하세요. 이미지로만 된 PDF는 텍스트 추출이 어려울 수 있고 문서 구조에 따라 누락될 수 있습니다. 필요한 내용을 텍스트로 옮겨 보완합니다. 확인되지 않은 사실은 추측해서 채우지 말고 확인 필요로 남기세요.</p>
+  <p>HWPX의 문단 구조가 너무 깊다는 안내가 나오면 필요한 부분을 별도 파일로 저장하거나 텍스트로 붙여넣으세요.</p>
 </section>
 
 <section id="draft">
@@ -237,6 +239,7 @@ HTML = r'''<!doctype html>
   </figure>
   <aside class="note"><p><strong>최종 원고는 사람이 확인합니다.</strong> AI가 제시한 기관명·날짜·인원·장소·인용과 보도 시점을 원자료와 대조하세요. 맞춤법 수정안에서도 의미나 수치가 바뀌지 않았는지 확인합니다.</p></aside>
   <p>검사 중 초안이 바뀌어 적용할 수 없다는 안내가 나오면, 현재 초안을 기준으로 맞춤법 검사를 다시 실행하세요.</p>
+  <p>AI 작업을 멈추려면 <strong>취소</strong>를 누릅니다. 명령줄 AI 작업을 취소하거나 제한 시간을 넘기면 앱이 그 작업에서 시작한 하위 프로세스도 정리합니다.</p>
 </section>
 
 <section id="save">
@@ -249,6 +252,7 @@ HTML = r'''<!doctype html>
   </ol>
   <p>기본 파일명은 <code>날짜_보도자료_초안.txt</code>, <code>날짜_보도자료_초안.md</code>, <code>날짜_보도자료_초안.hwpx</code>입니다. 같은 이름이 있으면 새 이름으로 저장합니다. MD는 제목·강조 등 서식 기호를 유지하고 TXT는 해당 기호를 정리하므로 표시 형식에 차이가 있습니다.</p>
   <p><strong>HWPX</strong>는 인천광역시교육청 보도자료 양식에 제목·본문 문단·보도 희망일·제공일·사진 여부·담당 부서를 채운 파일입니다. 초안의 ‘## 보도자료 초안’ 아래 제목 한 줄과 본문 문단이 구분되어 있어야 하며, 작성 보류 초안은 양식으로 저장하지 않습니다. 보도 희망일을 입력하지 않으면 보도 시점과 제공일 칸은 빈칸으로 남으므로 한글에서 직접 기재하세요. 자료문의 이름·연락처는 한글에서 직접 기재하고, 누리집 탑재 전에 한글로 열어 서식을 확인하세요. 한글이 설치되지 않은 PC나 웹 미리보기에서는 양식 글꼴(휴먼명조·한양견고딕 등)이 다른 글꼴로 바뀌어 보일 수 있으며, 이는 교육청 원본 양식을 열 때와 같습니다.</p>
+  <p>본문 소제목은 <code>### 모둠별 물 사용량 비교</code>처럼 별도 줄에 적으면 HWPX에 글자와 순서가 보존됩니다. 저장 후 한글에서 소제목과 앞뒤 문단을 확인하세요. ‘검토 의견’은 제출 양식의 본문에 들어가지 않습니다.</p>
   <aside class="note"><p><strong>폴더를 여는 것만으로는 저장되지 않습니다.</strong> 초안을 고친 뒤에는 다시 <strong>초안 저장</strong>을 눌러야 합니다. 원자료와 편집 내용이 다음 실행에 자동 복원된다고 가정하지 말고, 앱을 닫기 전에 필요한 원고를 파일로 저장하세요.</p></aside>
   <p>저장이 실패하면 하단 오류 안내와 표시된 경로를 먼저 확인하고 쓰기 가능한 폴더를 다시 지정합니다. 생성된 파일을 확인하기 전에는 앱을 닫지 마세요.</p>
 </section>
@@ -272,6 +276,7 @@ HTML = r'''<!doctype html>
     <li>앱을 다시 실행해 새 버전을 사용합니다.</li>
   </ol>
   <p>실행 파일이 있는 폴더에 쓰기 권한이 필요합니다. PC를 바로 끄면 준비된 파일은 적용되지 않고 삭제됩니다. 교체한 이전 실행 파일은 같은 폴더에 가장 최근 <code>.bak</code> 하나만 보관합니다. 자동 업데이트는 실행 파일에 적용되며 최신 안내 파일은 릴리스에서 별도로 내려받을 수 있습니다.</p>
+  <p>여러 창을 열어 둔 동안에는 다른 창에서 사용 중인 업데이트 파일을 보존합니다. ‘업데이트를 시작하지 못했습니다’가 표시되면 앱을 다시 열고 업데이트를 내려받으세요.</p>
 </section>
 
 <section id="help">
@@ -294,7 +299,7 @@ HTML = r'''<!doctype html>
   </details>
   <details open>
     <summary>작업 폴더가 비어 있습니다.</summary>
-    <p>TXT·MD 형식을 선택하고 <strong>초안 저장</strong>을 눌렀는지 확인하세요. 하단에 표시된 실제 저장 경로가 지금 연 폴더와 같은지 대조합니다. 오류가 있으면 문구를 확인하고 저장 폴더를 다시 지정하세요.</p>
+    <p>TXT·MD·HWPX 중 필요한 형식을 선택하고 <strong>초안 저장</strong>을 눌렀는지 확인하세요. 하단에 표시된 실제 저장 경로가 지금 연 폴더와 같은지 대조합니다. 오류가 있으면 문구를 확인하고 저장 폴더를 다시 지정하세요.</p>
   </details>
   <details open>
     <summary>작은 창에서 버튼이 안 보입니다.</summary>
@@ -302,7 +307,7 @@ HTML = r'''<!doctype html>
   </details>
 </section>
 <footer>
-  <p>인천교육 보도자료 작성기 v0.1.19 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.19">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
+  <p>인천교육 보도자료 작성기 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/latest">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
   <p>이 HTML은 그림·스타일을 포함하므로 내려받아 브라우저에서 바로 열 수 있습니다. 외부 링크와 AI 서비스 이용에는 인터넷 연결이 필요합니다. 화면 예시는 가상 자료이며 실제 보도자료가 아닙니다.</p>
 </footer>
 </main>
@@ -348,8 +353,9 @@ HTML = HTML.replace("@@PROOFREAD@@", data_uri(SHOTS / "proofreading.png", "image
 script = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
 HTML = HTML.replace("@@SCRIPTHASH@@", base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
 payload = HTML.encode("utf-8")
-local = ROOT / "사용안내_v0.1.19.html"
-release = ROOT / "artifacts/v0.1.19/release/PressReleaseWriter-Guide-ko.html"
+local = ROOT / "사용안내.html"
+version = ElementTree.parse(ROOT / "source/Desktop/Desktop.csproj").findtext("PropertyGroup/Version")
+release = ROOT / f"artifacts/v{version}/release/PressReleaseWriter-Guide.html"
 release.parent.mkdir(parents=True, exist_ok=True)
 local.write_bytes(payload)
 release.write_bytes(payload)

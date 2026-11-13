@@ -7,9 +7,11 @@ import hashlib
 import json
 import struct
 import re
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parent.parent
-path = ROOT / "사용안내_v0.1.19.html"
+path = ROOT / "사용안내.html"
+version = ElementTree.parse(ROOT / "source/Desktop/Desktop.csproj").findtext("PropertyGroup/Version")
 payload = path.read_bytes()
 source = payload.decode("utf-8")
 
@@ -78,18 +80,20 @@ for img in p.images:
 assert len(images) == 3
 assert "@media(max-width:480px)" in source and "@media print" in source
 assert "Content-Security-Policy" in source
-asset = ROOT / "artifacts/v0.1.19/release/PressReleaseWriter-Guide-ko.html"
+assert "/releases/tag/" not in source and not re.search(r"\bv\d+\.\d+\.\d+\b", source)
+assert all(term in source for term in ("문단 구조가 너무 깊", "하위 프로세스", "### 모둠별 물 사용량 비교", "업데이트를 시작하지 못했습니다"))
+asset = ROOT / f"artifacts/v{version}/release/PressReleaseWriter-Guide.html"
 assert asset.read_bytes() == payload
 result = {
     "request":"사용방법에 대한 html 파일 별도 제작, 릴리스에 같이 첨부",
-    "scope":"v0.1.19 오프라인 HTML 안내 생성과 릴리스 첨부. HWPX 읽기·저장, CLI 종료, 업데이트 안정성 수정 반영.",
+    "scope":"공통 오프라인 HTML 안내. HWPX 읽기·저장, CLI 종료, 업데이트 안정성 수정 반영.",
     "status":"PASS",
     "file":str(path),"bytes":len(payload),"sha256":hashlib.sha256(payload).hexdigest(),
     "sections":p.sections,"links":len(p.links),"images":images,
     "checks":["UTF-8 Korean", "balanced markup", "unique IDs and internal anchors", "embedded images decoded", "PNG dimensions match", "single CSP-hashed local script; no automatic external resources", "release copy identical", "responsive and print styles present", "no local path or account identifiers"],
     "rendering":"NOT_RUN: static checks only; view the HTML in a browser separately",
 }
-record = ROOT / "artifacts/v0.1.19/verification/html-guide-check.json"
+record = ROOT / f"artifacts/v{version}/verification/common-html-guide-check.json"
 record.parent.mkdir(parents=True, exist_ok=True)
 record.write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding="utf-8")
 print(json.dumps({k:v for k,v in result.items() if k not in {"request","scope","file","images","checks"}},ensure_ascii=False))

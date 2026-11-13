@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const html = fs.readFileSync('사용안내_v0.1.19.html','utf8');
+const html = fs.readFileSync('사용안내.html','utf8');
 const code = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 function run(stored, blocked=false, dark=false) {
   const elements = {};
