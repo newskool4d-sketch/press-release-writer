@@ -14,6 +14,7 @@ public static class SourceFiles
 {
     public const int MaxInput = 50_000;
     const long MaxBytes = 25 * 1024 * 1024;
+    const int MaxParagraphDepth = 64;
 
     public static SourceText Read(string path)
     {
@@ -86,8 +87,10 @@ public static class SourceFiles
         return new(text, "HWPX 문단·표·글상자·각주를 읽었습니다. 그림이나 복잡한 서식의 내용은 원본에서 확인해 주세요.");
     }
 
-    static string ReadParagraph(XElement paragraph)
+    static string ReadParagraph(XElement paragraph, int depth = 1)
     {
+        if (depth > MaxParagraphDepth)
+            throw new InvalidDataException("HWPX의 문단 구조가 너무 깊습니다. 필요한 부분을 별도로 저장해 주세요.");
         var output = new StringBuilder();
         foreach (var element in paragraph.Descendants())
         {
@@ -105,7 +108,7 @@ public static class SourceFiles
                     // and hidden comments and memos are notes to the author, not source text to send.
                     if (!element.Ancestors().TakeWhile(ancestor => ancestor != paragraph)
                             .Any(ancestor => ancestor.Name.LocalName is "tc" or "hiddenComment" or "fieldBegin"))
-                        output.AppendLine().AppendLine(ReadParagraph(element).Trim());
+                        output.AppendLine().AppendLine(ReadParagraph(element, depth + 1).Trim());
                     break;
                 case "tbl":
                     output.AppendLine();
@@ -118,7 +121,7 @@ public static class SourceFiles
                             string.Join(" / ", cell.Descendants().Where(e => e.Name.LocalName == "p" &&
                                 e.Ancestors().First(a => a.Name.LocalName == "tc") == cell &&
                                 e.Ancestors().FirstOrDefault(a => a.Name.LocalName == "p") == paragraph)
-                                .Select(p => ReadParagraph(p).Trim())))));
+                                .Select(p => ReadParagraph(p, depth + 1).Trim())))));
                     }
                     break;
             }

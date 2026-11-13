@@ -197,7 +197,7 @@ public static partial class Writing
     public static PressFormFields FormFields(string draft, WritingContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
-        var parts = ReadDraftParts(draft);
+        var parts = ReadDraftParts(draft, preserveSubheadings: true);
         if (parts.Held) throw new InvalidDataException("작성 보류 초안은 공식 양식으로 저장하지 않습니다.");
         if (parts.Title == null || parts.Paragraphs.Count == 0)
             throw new InvalidDataException("공식 양식 저장은 제목과 본문이 구분된 초안에서만 가능합니다. ‘## 보도자료 초안’ 아래 제목 한 줄과 본문 문단을 확인해 주세요.");
@@ -211,7 +211,7 @@ public static partial class Writing
         public IReadOnlyList<string> Paragraphs => ParagraphList ?? [];
     }
 
-    static DraftParts ReadDraftParts(string value)
+    static DraftParts ReadDraftParts(string value, bool preserveSubheadings = false)
     {
         var lines = new List<string>();
         var hasDraftHeading = false;
@@ -253,7 +253,13 @@ public static partial class Writing
         }
         else if (hasTitleLabel) title = first[(first.IndexOfAny([':', '：']) + 1)..].Trim();
 
-        var bodyLines = lines.Select(line => IsSectionLabel(line) ? "" : line).ToArray();
+        var bodyLines = lines.Select(line =>
+        {
+            var trimmed = line.TrimStart();
+            if (IsSectionLabel(trimmed)) return "";
+            if (!IsMarkdownHeading(trimmed)) return line;
+            return preserveSubheadings ? $"\n{PlainText(trimmed)}\n" : "";
+        }).SelectMany(line => line.Split('\n')).ToArray();
         var body = JoinText(bodyLines);
         var paragraphs = new List<string>();
         var current = new List<string>();
@@ -275,11 +281,12 @@ public static partial class Writing
 
     static bool IsSectionLabel(string line)
     {
-        if (Regex.IsMatch(line, @"^[ \t]*#{1,6}[ \t]+")) return true;
         var label = PlainText(line).Trim();
         return label is "리드문" or "[리드문]" or "본문" or "[본문]" or "마무리" or "[마무리]" or
             "[마무리 인용 또는 안내]" or "[마무리 인용문 또는 안내]";
     }
+
+    static bool IsMarkdownHeading(string line) => Regex.IsMatch(line, @"^#{1,6}[ \t]+");
 
     static string JoinText(IEnumerable<string> lines) =>
         string.Join(" ", lines.Select(line => PlainText(line).Trim()).Where(line => line.Length > 0));

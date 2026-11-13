@@ -656,14 +656,23 @@ sealed class MainWindow : Window
             updateCancellation.Cancel();
             if (updateCheck != null) await updateCheck;
             if (closingApproved) return; // The session ended while waiting; OnSessionEnding already cleaned up.
-            if (stagedUpdate != null)
+            if (stagedUpdate is { } pending)
             {
+                var applying = false;
                 try
                 {
-                    if (!await ReleaseUpdater.LaunchApplyAsync(stagedUpdate)) ReleaseUpdater.Discard(stagedUpdate);
+                    applying = await ReleaseUpdater.LaunchApplyAsync(pending);
                 }
-                catch (Exception) { ReleaseUpdater.Discard(stagedUpdate); }
+                catch (Exception) { }
                 stagedUpdate = null;
+                if (!applying)
+                {
+                    ReleaseUpdater.Discard(pending);
+                    if (!closingApproved)
+                        MessageBox.Show(this, "업데이트를 시작하지 못했습니다. 앱을 다시 열고 업데이트를 내려받아 주세요.",
+                            Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                if (closingApproved) return;
             }
             closingApproved = true;
             // ResetCodex may complete synchronously; leave this Closing event before closing again.

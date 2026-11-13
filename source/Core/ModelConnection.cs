@@ -485,19 +485,32 @@ public static class Models
         info.RedirectStandardInput = info.RedirectStandardOutput = info.RedirectStandardError = true;
         info.StandardInputEncoding = new UTF8Encoding(false);
         info.StandardOutputEncoding = info.StandardErrorEncoding = Encoding.UTF8;
-        using var process = Process.Start(info) ?? throw new InvalidOperationException("CLI를 시작하지 못했습니다.");
-        var output = process.StandardOutput.ReadToEndAsync(token);
-        var error = process.StandardError.ReadToEndAsync(token);
+        using var owned = OperatingSystem.IsWindows() ? WindowsCliProcess.Start(info) : null;
+        using var process = owned?.Process ?? Process.Start(info) ?? throw new InvalidOperationException("CLI를 시작하지 못했습니다.");
+        using var stopOnCancel = owned == null ? default : token.Register(owned.Stop);
+        var input = owned?.Input ?? process.StandardInput;
+        var output = (owned?.Output ?? process.StandardOutput).ReadToEndAsync(token);
+        var error = (owned?.Error ?? process.StandardError).ReadToEndAsync(token);
         try
         {
-            if (prompt != null) await process.StandardInput.WriteAsync(prompt.AsMemory(), token);
-            process.StandardInput.Close();
+            if (prompt != null) await input.WriteAsync(prompt.AsMemory(), token);
+            input.Close();
             await process.WaitForExitAsync(token);
             var stdout = await output;
             var stderr = await error;
+            token.ThrowIfCancellationRequested();
             return (process.ExitCode, stdout, stderr);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException("연결 또는 생성 시간이 초과되었습니다. 로그인·네트워크를 확인해 주세요.");
+        }
+        catch (IOException) when (token.IsCancellationRequested && cancellationToken.IsCancellationRequested)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            throw;
+        }
+        catch (IOException) when (token.IsCancellationRequested)
         {
             throw new TimeoutException("연결 또는 생성 시간이 초과되었습니다. 로그인·네트워크를 확인해 주세요.");
         }
@@ -507,6 +520,7 @@ public static class Models
         }
         finally
         {
+            owned?.Stop();
             await StopAsync(process);
             try { await Task.WhenAll(output, error); } catch (OperationCanceledException) { } catch (IOException) { }
         }

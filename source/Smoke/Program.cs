@@ -102,6 +102,21 @@ try
     Require(boxedText.StartsWith("글상자 일시") && boxedText.Contains("각주 인원") && boxedText.Contains("칸 속 글상자") &&
         boxedText.Split("칸 속 글상자").Length == 2 && !boxedText.Contains("숨은 설명"), "HWPX text boxes and footnotes are read once, hidden comments are not");
 
+    string NestedParagraphs(int depth)
+    {
+        var path = Path.Combine(dir, $"문단-경계-{depth}.hwpx");
+        using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
+        using var xml = new StreamWriter(zip.CreateEntry("Contents/section0.xml").Open());
+        xml.Write("<s>" + string.Concat(Enumerable.Repeat("<p>", depth)) + "<t>합성 문단</t>" +
+            string.Concat(Enumerable.Repeat("</p>", depth)) + "</s>");
+        return path;
+    }
+    Require(SourceFiles.Read(NestedParagraphs(64)).Text == "합성 문단", "HWPX reads nested paragraphs at the supported boundary");
+    var rejectedDepth = false;
+    try { SourceFiles.Read(NestedParagraphs(65)); }
+    catch (InvalidDataException ex) { rejectedDepth = ex.Message.Contains("문단 구조가 너무 깊습니다"); }
+    Require(rejectedDepth, "HWPX reports a document error above the nested paragraph limit");
+
     if (args.Length > 0)
     {
         var pdf = SourceFiles.Read(args[0]).Text;

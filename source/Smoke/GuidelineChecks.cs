@@ -111,6 +111,15 @@ public static class GuidelineChecks
         var section = ReadEntry(hwpx, "Contents/section0.xml");
         require(!section.Contains("linesegarray") && section.Contains("&lt;") == false && section.Contains("&quot;확대할 계획&quot;") &&
             !section.Contains("paraPrIDRef=\"22\""), "form/line layout cache removed, text escaped, body uses the plain paragraph style");
+        var headedDraft = Draft("### 리드문\n학생들이 체험했다.\n  ### **신청 마감은 11월 20일**\n누리집에서 신청한다.");
+        var headedPath = Path.Combine(directory, "소제목.hwpx");
+        File.WriteAllBytes(headedPath, PressForm.Fill(Writing.FormFields(headedDraft, context)));
+        var headedText = SourceFiles.Read(headedPath).Text;
+        var headedLines = headedText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var leadIndex = Array.IndexOf(headedLines, "학생들이 체험했다.");
+        require(leadIndex >= 0 && headedLines.Skip(leadIndex).Take(3).SequenceEqual(
+                new[] { "학생들이 체험했다.", "신청 마감은 11월 20일", "누리집에서 신청한다." }) &&
+            !headedLines.Contains("리드문"), "form/preserves meaningful subheadings in order and omits section labels");
         var minimal = PressForm.Fill(new PressFormFields("제목 <A&B>", ["본문 한 문단"]));
         File.WriteAllBytes(Path.Combine(directory, "최소.hwpx"), minimal);
         var minimalText = SourceFiles.Read(Path.Combine(directory, "최소.hwpx")).Text;

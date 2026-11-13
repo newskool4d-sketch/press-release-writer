@@ -63,6 +63,26 @@ internal static class ReleaseUpdaterChecks
                 !Directory.EnumerateFileSystemEntries(Path.Combine(root, "updates")).Any(),
                 "updater rejects a correctly hashed asset without the expected Windows executable identity");
         }
+
+        var stage = Directory.CreateDirectory(Path.Combine(root, "updates", "stage-" + Guid.NewGuid().ToString("N"))).FullName;
+        var image = Path.Combine(stage, "PressReleaseWriter.exe");
+        File.WriteAllBytes(image, Fixture);
+        using var owner = ReleaseUpdater.OpenStageLease(stage);
+        var old = DateTime.UtcNow.AddHours(-25);
+        foreach (var path in Directory.EnumerateFiles(stage)) File.SetLastWriteTimeUtc(path, old);
+        Directory.SetLastWriteTimeUtc(stage, old);
+        using var cleanup = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+            { Content = new StringContent(Metadata(tag: "v0.1.9")) }));
+        await ReleaseUpdater.CheckLatestAsync(cleanup, current, root, default);
+        require(File.Exists(image), "updater preserves a day-old stage while another instance owns it");
+        using (ReleaseUpdater.OpenStageLease(stage))
+        {
+            owner.Dispose(); // The helper opens its lease before the first app releases its own.
+            await ReleaseUpdater.CheckLatestAsync(cleanup, current, root, default);
+            require(File.Exists(image), "updater preserves the stage during helper handoff");
+        }
+        await ReleaseUpdater.CheckLatestAsync(cleanup, current, root, default);
+        require(!Directory.Exists(stage), "updater removes the orphaned stage once the last lease is released");
     }
 
     static string Metadata(string tag = Tag, bool draft = false, bool prerelease = false, string? url = null,

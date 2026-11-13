@@ -41,6 +41,8 @@ static class ProcessChecks
 
             await CheckStoppedProcess(fixture, false, require);
             await CheckStoppedProcess(fixture, true, require);
+            await CheckStoppedProcess(fixture, false, require, rootExits: true);
+            await CheckStoppedProcess(fixture, true, require, rootExits: true);
         }
         finally
         {
@@ -168,11 +170,12 @@ static class ProcessChecks
             "Claude machine-readable result is returned as text");
     }
 
-    static async Task CheckStoppedProcess(string fixture, bool timeout, Action<bool, string> require)
+    static async Task CheckStoppedProcess(string fixture, bool timeout, Action<bool, string> require, bool rootExits = false)
     {
-        var pidFile = Path.Combine(fixture, timeout ? "timeout.pid" : "cancel.pid");
+        var scenario = rootExits ? "exit-with-leaf" : "hold-tree";
+        var pidFile = Path.Combine(fixture, scenario + (timeout ? "-timeout.pid" : "-cancel.pid"));
         using var cancellation = new CancellationTokenSource();
-        var operation = Models.RunAsync(Start("hold-tree", pidFile), [], "합성 취소 검증", cancellation.Token,
+        var operation = Models.RunAsync(Start(scenario, pidFile), [], "합성 취소 검증", cancellation.Token,
             timeout ? TimeSpan.FromSeconds(3) : TimeSpan.FromSeconds(20));
         Process? parentFixture = null, leafFixture = null;
         try
@@ -187,13 +190,21 @@ static class ProcessChecks
             var pids = File.ReadAllText(pidFile).Split(',');
             parentFixture = OpenFixture(int.Parse(pids[0]));
             leafFixture = OpenFixture(int.Parse(pids[1]));
+            if (rootExits)
+            {
+                if (parentFixture != null) await parentFixture.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2));
+                require(leafFixture is { HasExited: false } && !operation.IsCompleted,
+                    "Windows CLI descendant holds the output open after the launcher exits");
+            }
             if (!timeout) cancellation.Cancel();
             Exception? observed = null;
             try { await operation; }
             catch (Exception ex) when (ex is OperationCanceledException or TimeoutException) { observed = ex; }
             require(timeout ? observed is TimeoutException : observed is OperationCanceledException,
                 timeout ? "Windows CLI timeout is distinct from cancellation" : "Windows CLI cancellation propagated");
-            require(IsGone(parentFixture) && IsGone(leafFixture), timeout ? "Windows CLI timeout stops parent and descendant" : "Windows CLI cancel stops parent and descendant");
+            if (leafFixture != null) await Task.WhenAny(leafFixture.WaitForExitAsync(), Task.Delay(1000));
+            require(IsGone(parentFixture) && IsGone(leafFixture),
+                $"Windows CLI {(timeout ? "timeout" : "cancel")} stops descendants ({scenario})");
         }
         finally
         {
@@ -261,16 +272,16 @@ static class ProcessChecks
         }
         if (scenario == "leaf")
         {
-            await Task.Delay(Timeout.InfiniteTimeSpan);
+            await Task.Delay(TimeSpan.FromSeconds(25));
             return true;
         }
-        if (scenario == "hold-tree")
+        if (scenario is "hold-tree" or "exit-with-leaf")
         {
             using var leaf = Process.Start(Start("leaf")) ?? throw new InvalidOperationException("Mock leaf failed to start.");
             var temporary = args[2] + ".tmp";
             File.WriteAllText(temporary, Environment.ProcessId + "," + leaf.Id);
             File.Move(temporary, args[2]);
-            await Task.Delay(Timeout.InfiniteTimeSpan);
+            if (scenario == "hold-tree") await Task.Delay(TimeSpan.FromSeconds(25));
             return true;
         }
         _ = await Console.In.ReadToEndAsync();

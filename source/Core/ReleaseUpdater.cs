@@ -14,13 +14,14 @@ namespace PressRelease;
 
 public sealed class StagedUpdate
 {
-    internal StagedUpdate(Version version, string path, string digest, long size)
-        => (Version, Path, Digest, Size) = (version, path, digest, size);
+    internal StagedUpdate(Version version, string path, string digest, long size, FileStream lease)
+        => (Version, Path, Digest, Size, Lease) = (version, path, digest, size, lease);
 
     public Version Version { get; }
     internal string Path { get; }
     internal string Digest { get; }
     internal long Size { get; }
+    internal FileStream Lease { get; }
 }
 
 /// <summary>A newer verified release whose executable has not been downloaded yet.</summary>
@@ -41,11 +42,12 @@ public static class ReleaseUpdater
     const string StagePrefix = "stage-";
     const string FinishedFile = "finished";
     const string PartFile = "download.part";
+    const string LeaseFile = "active.lock";
     const long MaxAssetBytes = 512L * 1024 * 1024;
     const int MaxMetadataBytes = 1024 * 1024;
     static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(20);
     static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(15);
-    // A stage without a completion marker belongs to a crashed or killed run once it is this old.
+    // Keep recent unfinished stages for recovery. Older stages still need an exclusive cleanup lease.
     static readonly TimeSpan OrphanStageAge = TimeSpan.FromHours(24);
 
     public const string ReleasePage = "https://github.com/" + Repository + "/releases/latest";
@@ -116,18 +118,21 @@ public static class ReleaseUpdater
             Directory.CreateDirectory(updates);
             RequireRegularPath(updates);
             var stage = Directory.CreateDirectory(Path.Combine(updates, StagePrefix + Guid.NewGuid().ToString("N"))).FullName;
+            FileStream? lease = null;
             try
             {
+                lease = OpenStageLease(stage);
                 var part = Path.Combine(stage, PartFile);
                 await DownloadAsync(http, release, part, limit.Token).ConfigureAwait(false);
                 if (ReadProductVersion(part) != release.Version)
                     throw new InvalidDataException("업데이트 실행 파일의 제품이나 버전이 일치하지 않습니다.");
                 var executable = Path.Combine(stage, AssetName);
                 File.Move(part, executable);
-                return new StagedUpdate(release.Version, executable, release.Digest, release.Size);
+                return new StagedUpdate(release.Version, executable, release.Digest, release.Size, lease);
             }
             catch
             {
+                lease?.Dispose();
                 CleanStage(stage);
                 throw;
             }
@@ -232,12 +237,14 @@ public static class ReleaseUpdater
             start.ArgumentList.Add(arg);
         using var helper = Process.Start(start);
         if (helper == null) return false;
-        return await Task.Run(() =>
+        var acknowledged = await Task.Run(() =>
         {
             while (!limit.IsCancellationRequested && !helper.HasExited)
                 if (ready.WaitOne(100)) return true;
             return ready.WaitOne(0);
         }).ConfigureAwait(false);
+        if (acknowledged) pending.Lease.Dispose(); // The helper holds its own lease before signaling readiness.
+        return acknowledged;
     }
 
     public static bool TryRunApplyMode(string[] args)
@@ -256,6 +263,7 @@ public static class ReleaseUpdater
         {
             var id = ValidateStage(image, args[6]);
             stage = Path.GetDirectoryName(image)!;
+            using var lease = OpenStageLease(stage);
             var target = Path.GetFullPath(args[1]);
             if (SamePath(target, image) || !string.Equals(Path.GetExtension(target), ".exe", StringComparison.OrdinalIgnoreCase))
                 return true;
@@ -330,7 +338,22 @@ public static class ReleaseUpdater
         }
     }
 
-    public static void Discard(StagedUpdate pending) => CleanStage(Path.GetDirectoryName(pending.Path)!);
+    public static void Discard(StagedUpdate pending)
+    {
+        pending.Lease.Dispose();
+        CleanStage(Path.GetDirectoryName(pending.Path)!);
+    }
+
+    internal static FileStream OpenStageLease(string stage, FileShare share = FileShare.Read)
+    {
+        var path = Path.Combine(stage, LeaseFile);
+        if (!File.Exists(path))
+        {
+            using var create = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read, FileShare.Read);
+        }
+        RequireRegularPath(path);
+        return File.Open(path, FileMode.Open, FileAccess.Read, share);
+    }
 
     static string ValidateStage(string image, string appFolder)
     {
@@ -366,8 +389,6 @@ public static class ReleaseUpdater
         foreach (var stage in Directory.EnumerateDirectories(updates, StagePrefix + "*"))
         {
             if (!IsStageName(Path.GetFileName(stage))) continue;
-            // A finished helper leaves a marker. A marker-less stage from a crashed or killed run is removed once it is old;
-            // the age guard protects a stage another live instance has just prepared.
             if (File.Exists(Path.Combine(stage, FinishedFile)) || StageTime(stage) < cutoff) CleanStage(stage);
         }
     }
@@ -396,10 +417,14 @@ public static class ReleaseUpdater
         {
             if (!IsStageName(Path.GetFileName(stage)) || !Directory.Exists(stage)) return;
             RequireRegularPath(stage);
-            // The helper's own image stays locked until it exits. Keep the completion marker if deletion fails.
-            if (!TryDelete(Path.Combine(stage, AssetName))) return;
-            TryDelete(Path.Combine(stage, PartFile));
-            TryDelete(Path.Combine(stage, FinishedFile));
+            using (OpenStageLease(stage, FileShare.None))
+            {
+                // The helper's own image stays locked until it exits. Keep its marker if deletion fails.
+                if (!TryDelete(Path.Combine(stage, AssetName))) return;
+                TryDelete(Path.Combine(stage, PartFile));
+                TryDelete(Path.Combine(stage, FinishedFile));
+            }
+            if (!TryDelete(Path.Combine(stage, LeaseFile))) return;
             Directory.Delete(stage, recursive: false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
