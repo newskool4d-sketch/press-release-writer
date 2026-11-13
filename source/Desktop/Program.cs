@@ -19,6 +19,13 @@ static class Program
     {
         if (ReleaseUpdater.TryRunApplyMode(args)) return;
         var application = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
+        // An unexpected error in a UI handler must not close the window and discard the unsaved source and draft.
+        application.DispatcherUnhandledException += (_, e) =>
+        {
+            e.Handled = true;
+            MessageBox.Show("예기치 않은 오류가 발생했습니다. 초안을 저장한 뒤 앱을 다시 열어 주세요.\n" + e.Exception.Message,
+                "보도자료 작성기", MessageBoxButton.OK, MessageBoxImage.Warning);
+        };
         try
         {
             string? dataDirectory = null;

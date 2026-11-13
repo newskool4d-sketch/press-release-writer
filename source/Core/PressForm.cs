@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Security;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace PressRelease;
 
@@ -24,6 +25,7 @@ public static class PressForm
 {
     const string ResourceName = "PressRelease.PressForm.hwpx";
     const string SectionEntry = "Contents/section0.xml";
+    const string PreviewEntry = "Preview/PrvText.txt";
     const string TitlePlaceholder = "[제목 기재]";
     const string ContactTable = "<hp:tbl id=\"1241227521\"";
     const string ReminderText = "(위 공공저작물 자유이용 허락 관련 표를 꼭 넣어주세요)";
@@ -54,6 +56,11 @@ public static class PressForm
                     using var text = new StreamReader(reader, new UTF8Encoding(false));
                     var filled = FillSection(text.ReadToEnd(), fields);
                     var bytes = new UTF8Encoding(false).GetBytes(filled);
+                    writer.Write(bytes, 0, bytes.Length);
+                }
+                else if (entry.FullName == PreviewEntry)
+                {
+                    var bytes = new UTF8Encoding(false).GetBytes(PreviewText(fields));
                     writer.Write(bytes, 0, bytes.Length);
                 }
                 else reader.CopyTo(writer);
@@ -121,7 +128,27 @@ public static class PressForm
     }
 
     // A raw tab inside <hp:t> makes HWP drop the text that follows it, so tabs become plain spaces.
-    static string OneLine(string value) => Regex.Replace(value.Replace('\t', ' ').Trim(), @"\s*[\r\n]+\s*", " ");
+    // Form feeds and other control characters pasted from a PDF are not valid XML and would leave a file HWP cannot open.
+    static string OneLine(string value)
+    {
+        var text = new StringBuilder(value.Length);
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            if (character is '\t' or '\v' or '\f') text.Append(' ');
+            else if (char.IsHighSurrogate(character) && index + 1 < value.Length && char.IsLowSurrogate(value[index + 1]))
+                text.Append(character).Append(value[++index]);
+            else if (XmlConvert.IsXmlChar(character)) text.Append(character);
+        }
+        return Regex.Replace(text.ToString().Trim(), @"\s*[\r\n]+\s*", " ");
+    }
+
+    // Explorer previews and search indexes read this entry, so it describes the draft instead of the empty form.
+    static string PreviewText(PressFormFields fields)
+    {
+        var text = string.Join("\r\n\r\n", fields.Paragraphs.Select(OneLine).Where(paragraph => paragraph.Length > 0).Prepend(OneLine(fields.Title)));
+        return text.Length <= 1000 ? text : text[..1000];
+    }
 
     static string Escape(string value) => SecurityElement.Escape(value);
 }

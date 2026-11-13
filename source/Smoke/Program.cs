@@ -89,6 +89,19 @@ try
     var extracted = SourceFiles.Read(hwpx).Text;
     Require(extracted.StartsWith(Korean) && extracted.Contains("대상 | 75명") && extracted.EndsWith("끝 문단"), "HWPX table/section order");
 
+    var boxed = Path.Combine(dir, "글상자.hwpx");
+    using (var zip = ZipFile.Open(boxed, ZipArchiveMode.Create))
+    using (var xml = new StreamWriter(zip.CreateEntry("Contents/section0.xml").Open()))
+        xml.Write("""
+            <s xmlns:h="urn:test"><h:p><h:run><h:rect><h:drawText><h:subList><h:p><h:run><h:t>글상자 일시</h:t></h:run></h:p></h:subList></h:drawText></h:rect></h:run></h:p>
+            <h:p><h:run><h:t>본문</h:t><h:ctrl><h:footNote><h:subList><h:p><h:run><h:t>각주 인원</h:t></h:run></h:p></h:subList></h:footNote></h:ctrl></h:run></h:p>
+            <h:p><h:run><h:tbl><h:tr><h:tc><h:subList><h:p><h:run><h:t>칸</h:t><h:rect><h:drawText><h:subList><h:p><h:run><h:t>칸 속 글상자</h:t></h:run></h:p></h:subList></h:drawText></h:rect></h:run></h:p></h:subList></h:tc></h:tr></h:tbl></h:run></h:p>
+            <h:p><h:run><h:t>끝</h:t><h:ctrl><h:hiddenComment><h:subList><h:p><h:run><h:t>숨은 설명</h:t></h:run></h:p></h:subList></h:hiddenComment></h:ctrl></h:run></h:p></s>
+            """);
+    var boxedText = SourceFiles.Read(boxed).Text;
+    Require(boxedText.StartsWith("글상자 일시") && boxedText.Contains("각주 인원") && boxedText.Contains("칸 속 글상자") &&
+        boxedText.Split("칸 속 글상자").Length == 2 && !boxedText.Contains("숨은 설명"), "HWPX text boxes and footnotes are read once, hidden comments are not");
+
     if (args.Length > 0)
     {
         var pdf = SourceFiles.Read(args[0]).Text;

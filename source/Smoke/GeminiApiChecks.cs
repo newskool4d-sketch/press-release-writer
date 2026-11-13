@@ -7,7 +7,7 @@ static class GeminiApiChecks
 {
     const string FakeKey = "test-api-key-do-not-send";
     const string PrivateMarker = "synthetic-private-value";
-    const string ModelPath = "/v1beta/models/gemini-2.5-flash";
+    const string ModelPath = "/v1beta/models/" + GeminiApiClient.Model;
 
     public static async Task RunAsync(Action<bool, string> require)
     {
@@ -34,6 +34,10 @@ static class GeminiApiChecks
                 contents[0].GetProperty("parts")[0].GetProperty("text").GetString() == prompt &&
                 !root.TryGetProperty("tools", out _) && !root.GetRawText().Contains(FakeKey),
                 "Gemini API generation sends plain prompt text without tools or a key in the body");
+            var generation = root.GetProperty("generationConfig");
+            require(GeminiApiClient.Model != "gemini-2.5-flash" && generation.GetProperty("maxOutputTokens").GetInt32() >= 16384 &&
+                generation.GetProperty("thinkingConfig").GetProperty("thinkingLevel").GetString() == "low",
+                "Gemini API uses a model open to new keys and keeps thinking from exhausting the output limit");
             return Json(HttpStatusCode.OK, """{"candidates":[{"finishReason":"STOP","content":{"parts":[{"text":"hidden","thought":true},{"text":"보도자료"},{"text":" 초안"}]}}]}""");
         })))
         {

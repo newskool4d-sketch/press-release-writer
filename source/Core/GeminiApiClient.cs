@@ -12,7 +12,9 @@ public sealed class GeminiApiException(string message, bool keyRejected = false)
 
 public sealed class GeminiApiClient(HttpClient http)
 {
-    public const string Model = "gemini-2.5-flash";
+    // Google limits the 2.5 models to projects that already used them, so a newly issued key needs a current model.
+    public const string Model = "gemini-3.8-flash";
+    const string ModelName = "Gemini 3.8 Flash";
     const string ModelUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + Model;
     const int MaxResponseBytes = 4 * 1024 * 1024;
     const int MaxErrorBytes = 32 * 1024;
@@ -29,7 +31,7 @@ public sealed class GeminiApiClient(HttpClient http)
         using var response = await SendAsync(apiKey, prompt: null, cancel).ConfigureAwait(false);
         var methods = Get(response.RootElement, "supportedGenerationMethods");
         if (methods.ValueKind != JsonValueKind.Array || !methods.EnumerateArray().Any(method => Text(method) == "generateContent"))
-            throw new GeminiApiException("이 프로젝트에서 Gemini 2.5 Flash의 텍스트 생성을 사용할 수 없습니다.");
+            throw new GeminiApiException($"이 프로젝트에서 {ModelName}의 텍스트 생성을 사용할 수 없습니다.");
     }
 
     public async Task<string> CompleteAsync(string? apiKey, string prompt, CancellationToken cancel)
@@ -49,7 +51,7 @@ public sealed class GeminiApiClient(HttpClient http)
         switch (Text(Get(candidate, "finishReason")))
         {
             case "STOP": break;
-            case "MAX_TOKENS": throw new GeminiApiException("출력 한도에 도달해 Gemini 응답이 잘렸습니다. 입력을 줄이고 다시 시도해 주세요.");
+            case "MAX_TOKENS": throw new GeminiApiException("출력 한도에 도달해 Gemini 응답이 잘렸습니다. 다시 시도하고, 반복되면 원자료를 줄여 주세요.");
             case "SAFETY" or "RECITATION" or "BLOCKLIST" or "PROHIBITED_CONTENT" or "SPII" or "MODEL_ARMOR":
                 throw new GeminiApiException("Gemini의 콘텐츠 정책에 따라 응답이 차단됐습니다. 입력 내용을 확인해 주세요.");
             default: throw new GeminiApiException("Gemini API가 텍스트 생성을 완료하지 못했습니다.");
@@ -85,7 +87,8 @@ public sealed class GeminiApiClient(HttpClient http)
                 Content = JsonContent.Create(new
                 {
                     contents = new[] { new { role = "user", parts = new[] { new { text = prompt } } } },
-                    generationConfig = new { maxOutputTokens = 8192 }
+                    // Thought tokens count against maxOutputTokens, so a short draft keeps thinking low and the limit roomy.
+                    generationConfig = new { maxOutputTokens = 16384, thinkingConfig = new { thinkingLevel = "low" } }
                 })
             };
         request.Headers.Add("x-goog-api-key", key);
@@ -128,7 +131,7 @@ public sealed class GeminiApiClient(HttpClient http)
             HttpStatusCode.Unauthorized => new("Gemini API 키가 거부됐습니다. Google AI Studio에서 키를 확인해 주세요.", keyRejected: true),
             HttpStatusCode.Forbidden => new("Gemini API 접근이 거부됐습니다. API 키의 제한과 프로젝트 권한을 확인해 주세요.", keyRejected: true),
             HttpStatusCode.TooManyRequests => new("Gemini API 사용 한도에 도달했습니다. Google AI Studio에서 한도를 확인해 주세요."),
-            HttpStatusCode.NotFound => new("이 프로젝트에서 Gemini 2.5 Flash 모델을 찾을 수 없습니다."),
+            HttpStatusCode.NotFound => new($"이 프로젝트에서 {ModelName} 모델을 찾을 수 없습니다."),
             HttpStatusCode.BadRequest => new("Gemini API 요청이 거부됐습니다. API 키, 프로젝트 설정 및 이용 가능 지역을 확인해 주세요."),
             _ when (int)response.StatusCode >= 500 => new("Gemini API 서비스에 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."),
             _ => new("Gemini API가 요청을 처리하지 못했습니다.")

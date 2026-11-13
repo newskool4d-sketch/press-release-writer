@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -18,7 +19,9 @@ public static class Proofreading
     static readonly Regex Numbers = new(@"\p{Nd}+(?:[.,]\p{Nd}+)*", RegexOptions.CultureInvariant);
     static readonly Regex LineBreaks = new(@"\r\n|\r|\n", RegexOptions.CultureInvariant);
     static readonly Regex Marks = new("[\"'“”‘’「」『』#*`]", RegexOptions.CultureInvariant);
-    static readonly Regex JsonFence = new(@"\A```(?:json)?[ \t]*\r?\n(?<json>[\s\S]*?)\r?\n```\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    // The default encoder turns every Hangul syllable into a \uXXXX escape, which multiplies the prompt and hides the text the model must quote exactly.
+    static readonly JsonSerializerOptions PromptJson = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    static readonly Regex JsonFence =new(@"\A```(?:json)?[ \t]*\r?\n(?<json>[\s\S]*?)\r?\n```\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static string Prompt(string original)
     {
@@ -42,7 +45,7 @@ public static class Proofreading
             - 확실한 교정 항목이 없으면 {"edits":[]}를 반환하세요.
 
             입력 JSON:
-            """ + "\n" + JsonSerializer.Serialize(new { text = original });
+            """ + "\n" + JsonSerializer.Serialize(new { text = original }, PromptJson);
     }
 
     public static ProofreadingResult Parse(string original, string response)

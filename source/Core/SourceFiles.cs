@@ -83,7 +83,7 @@ public static class SourceFiles
         }
         var text = output.ToString().Trim();
         if (text.Length == 0) throw new InvalidDataException("HWPX에서 읽을 수 있는 본문이 없습니다.");
-        return new(text, "HWPX 문단·표를 읽었습니다. 그림이나 복잡한 서식의 내용은 원본에서 확인해 주세요.");
+        return new(text, "HWPX 문단·표·글상자·각주를 읽었습니다. 그림이나 복잡한 서식의 내용은 원본에서 확인해 주세요.");
     }
 
     static string ReadParagraph(XElement paragraph)
@@ -99,6 +99,13 @@ public static class SourceFiles
                     foreach (var node in element.Nodes())
                         output.Append(node is XText text ? text.Value :
                             node is XElement space && space.Name.LocalName is "lineBreak" ? "\n" : " ");
+                    break;
+                case "p":
+                    // Text boxes, footnotes and captions hold their own paragraphs. Table cells are read with their table,
+                    // and hidden comments and memos are notes to the author, not source text to send.
+                    if (!element.Ancestors().TakeWhile(ancestor => ancestor != paragraph)
+                            .Any(ancestor => ancestor.Name.LocalName is "tc" or "hiddenComment" or "fieldBegin"))
+                        output.AppendLine().AppendLine(ReadParagraph(element).Trim());
                     break;
                 case "tbl":
                     output.AppendLine();

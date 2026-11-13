@@ -19,6 +19,11 @@ public static class GuidelineChecks
             !foreign.Contains("멘토→"), "guideline/flags flagged foreign words once each");
         require(!Writing.Check(Draft("학생 75명이 STFC 동아리에서 활동했다.")).Contains("TF→"), "guideline/TF inside a Latin word is not flagged");
         require(Writing.Check(Draft("학생 75명의 멘토가 참여했다.")).Contains("멘토→지도자"), "guideline/standalone 멘토 is flagged");
+        var compound = Writing.Check(Draft("학생 75명에게 안전매뉴얼과 교육데이터, 온라인플랫폼을 제공하고 진로멘토링과 전담TF를 운영한다."));
+        require(compound.Contains("매뉴얼→") && compound.Contains("데이터→") && compound.Contains("플랫폼→") && compound.Contains("멘토링→") &&
+            compound.Contains("TF→"), "guideline/foreign words inside unspaced Korean compounds are flagged");
+        require(Writing.Prompt("원자료", "직속기관", "확인 필요", false).Contains("플랫폼·콘텐츠·인프라·스마트·글로벌"),
+            "guideline/prompt names every foreign word the review checks");
 
         var dated = Writing.Check(Draft("학생 75명이 2026. 4. 18. 참여했다. 신청은 2026-05-01까지다."));
         require(dated.Contains("공문서식 날짜") && dated.Contains("‘2026. 4. 18.’") && dated.Contains("‘2026-05-01’"), "guideline/flags official document date styles");
@@ -59,6 +64,10 @@ public static class GuidelineChecks
             Timeliness.OfficialDate(new DateOnly(2026, 11, 6)) == "2026. 11. 6.(금)", "timeliness/date parsing and formatting");
         require(Timeliness.Parse("2026-11-05 오후 2시 30분", out var hasTime, out _) == new DateTime(2026, 11, 5, 14, 30, 0) && hasTime,
             "timeliness/Korean afternoon time is parsed");
+        // These run on every keystroke in the condition fields, so an out-of-range year must be reported, never thrown.
+        require(new[] { "0000-01-01", "00000101", "0001-01-01", "0026-11-06" }.All(year =>
+            Timeliness.Evaluate(Dates(year, null, year, year)).Count(line => line.Contains("형식 확인")) == 3 &&
+            Writing.ContextCheck(Dates(year, null, year, year)).Contains("형식 확인")), "timeliness/implausible years are reported as malformed");
 
         // Rejection baseline comes from the officer; the prompt carries it and the newly added categories.
         var rejections = Writing.RejectionReasons.Select(reason => new RejectionCheck(reason, Writing.NotApplicable)).ToList();
@@ -112,6 +121,14 @@ public static class GuidelineChecks
         var tabSection = ReadEntry(Path.Combine(directory, "탭.hwpx"), "Contents/section0.xml");
         require(!tabSection.Contains('\t') && tabSection.Contains("제목 탭") && tabSection.Contains("앞 뒤 글자") && tabSection.Contains("교학과 팀"),
             "form/tabs become spaces so HWP keeps the text after them");
+        File.WriteAllBytes(Path.Combine(directory, "제어문자.hwpx"), PressForm.Fill(new PressFormFields("제목\u0001 하나", ["앞\f뒤", "세로\v탭 😀"], Department: "교학과\u0002팀")));
+        var controlSection = ReadEntry(Path.Combine(directory, "제어문자.hwpx"), "Contents/section0.xml");
+        System.Xml.Linq.XDocument.Parse(controlSection);
+        require(controlSection.Contains("제목 하나") && controlSection.Contains("앞 뒤") && controlSection.Contains("세로 탭 😀") && controlSection.Contains("교학과팀"),
+            "form/control characters are removed so the section stays valid XML");
+        var preview = ReadEntry(hwpx, "Preview/PrvText.txt");
+        require(preview.StartsWith(fields.Title) && preview.Contains("이번 체험은 모둠 활동으로 진행했다.") && !preview.Contains("[제목 기재]") &&
+            !preview.Contains("2024. 10. 11."), "form/preview text describes the draft instead of the empty form");
         var metadata = ReadEntry(hwpx, "Contents/content.hpf");
         require(metadata.Contains("name=\"creator\" content=\"text\">인천광역시교육청<") && metadata.Contains("name=\"lastsaveby\" content=\"text\">인천광역시교육청<") &&
             !metadata.Contains("서울특별시교육청"), "form/file properties carry the institution instead of personal names");

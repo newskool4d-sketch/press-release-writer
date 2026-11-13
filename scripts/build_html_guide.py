@@ -1,4 +1,4 @@
-"""Build the offline v0.1.17 guide from public-safe, synthetic screenshots."""
+"""Build the offline v0.1.18 guide from public-safe, synthetic screenshots."""
 from pathlib import Path
 import base64
 import hashlib
@@ -16,9 +16,9 @@ HTML = r'''<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="인천교육 보도자료 작성기 v0.1.17 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
+  <meta name="description" content="인천교육 보도자료 작성기 v0.1.18 사용 안내. AI 연결, 원자료 입력, 초안 생성, 맞춤법 검사와 TXT·MD 저장 방법.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; script-src 'sha256-@@SCRIPTHASH@@'; base-uri 'none'; form-action 'none'">
-  <title>인천교육 보도자료 작성기 · v0.1.17 사용 안내</title>
+  <title>인천교육 보도자료 작성기 · v0.1.18 사용 안내</title>
   <style>
     :root { color-scheme: light; --paper:#fbfaf7; --ink:#253735; --muted:#526560; --line:#d6dfd9; --accent:#226c65; --wash:#edf4ef; }
     * { box-sizing:border-box; }
@@ -128,7 +128,7 @@ HTML = r'''<!doctype html>
 <a class="skip" href="#main">본문으로 이동</a>
 <header class="mast">
   <img src="@@CI@@" alt="인천광역시교육청" width="1271" height="335">
-  <p>보도자료 작성기<br>사용 안내 · v0.1.17</p>
+  <p>보도자료 작성기<br>사용 안내 · v0.1.18</p>
 </header>
 <div class="layout">
 <nav aria-label="사용 안내 목차">
@@ -145,7 +145,7 @@ HTML = r'''<!doctype html>
   </ol>
 </nav>
 <main id="main">
-<div class="version">인천교육 보도자료 작성기 · v0.1.17</div>
+<div class="version">인천교육 보도자료 작성기 · v0.1.18</div>
 <div class="reading-tools" role="group" aria-label="안내서 보기 설정" hidden>
   <label for="guide-theme">화면 <select id="guide-theme"><option value="light">라이트 모드</option><option value="dark">다크 모드</option></select></label>
   <label for="guide-size">글자 크기 <input id="guide-size" type="range" min="14" max="22" step="1" value="16"><output id="guide-size-value" for="guide-size" aria-live="polite">16px</output></label>
@@ -164,7 +164,7 @@ HTML = r'''<!doctype html>
 
 <section id="start">
   <h2><small>01</small>처음 시작하기</h2>
-  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.17">v0.1.17 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
+  <p><a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.18">v0.1.18 릴리스</a>에서 <code>PressReleaseWriter-win-x64.zip</code>을 내려받아 압축을 풀고 <code>PressReleaseWriter.exe</code>를 실행합니다. ZIP에는 .NET 런타임이 포함되어 있습니다. 로컬에 설치했다면 설치된 보도자료 작성기를 실행하세요.</p>
   <p>현재 배포본은 서명되지 않은 Windows x64용입니다. 실행 전 배포 저장소와 파일 출처를 확인하세요.</p>
   <ol class="quick">
     <li><strong>AI 연결</strong><a href="#connect">설정 → AI 연결</a>에서 로그인 또는 API 키 연결을 마칩니다.</li>
@@ -217,7 +217,7 @@ HTML = r'''<!doctype html>
     <p><strong>작성 조건</strong><br>기관 구분: 본청 / 보도 시점: 행사 완료<br>행사 시작일·종료일: 2026-11-06 / 대상·인원: 중학생 75명<br>공식 기관명 등 나머지 항목은 원자료로 확인한 값만 입력합니다.</p>
   </div>
   <h3>파일 열기와 끌어놓기</h3>
-  <p><strong>파일 열기</strong>로 TXT·MD·HWPX·텍스트 PDF를 선택하거나, 파일 탐색기의 파일을 <strong>원문 입력칸</strong>으로 끌어다 놓습니다. 텍스트는 직접 붙여넣을 수도 있습니다.</p>
+  <p><strong>파일 열기</strong>로 TXT·MD·HWPX·텍스트 PDF를 선택하거나, 파일 탐색기의 파일을 <strong>원문 입력칸</strong>으로 끌어다 놓습니다. 텍스트는 직접 붙여넣을 수도 있습니다. HWPX는 문단·표·글상자·각주의 글을 읽고, 숨은 설명과 메모는 읽지 않습니다.</p>
   <p>파일을 넣은 뒤 추출된 내용을 확인하세요. 이미지로만 된 PDF는 텍스트 추출이 어려울 수 있고 문서 구조에 따라 누락될 수 있습니다. 필요한 내용을 텍스트로 옮겨 보완합니다. 확인되지 않은 사실은 추측해서 채우지 말고 확인 필요로 남기세요.</p>
 </section>
 
@@ -226,7 +226,7 @@ HTML = r'''<!doctype html>
   <p>기존 원고를 검토하려면 <strong>원문</strong>에 기존 초안을 넣고, <strong>작성 조건 → 작성 유형 → 기존 초안 검토</strong>를 선택한 뒤 <strong>초안 생성</strong>을 누릅니다. 맞춤법만 검사할 때는 기존 원고를 가운데 초안 입력칸에 붙여넣고 <strong>맞춤법 검사</strong>를 누르세요.</p>
   <ol>
     <li>원문과 작성 조건을 확인하고 <strong>초안 생성</strong>을 누릅니다.</li>
-    <li>가운데 <strong>초안 작성·편집</strong>에 표시된 원고를 읽고 직접 편집합니다. 오른쪽 <strong>검토</strong> 영역의 분량·확인 안내도 함께 봅니다. 이 영역은 지침이 지양하는 표현(뜻깊·열띤·획기적·성공적으로 운영 등), 쉬운 우리말로 바꿀 외국어(매뉴얼·멘토·멘토링·프로젝트·TF·리더십·데이터·채널 등), ‘2026. 4. 18.’ 같은 공문서식 날짜도 표시합니다. 표시는 참고용이며 최종 판단은 담당자가 합니다.</li>
+    <li>가운데 <strong>초안 작성·편집</strong>에 표시된 원고를 읽고 직접 편집합니다. 오른쪽 <strong>검토</strong> 영역의 분량·확인 안내도 함께 봅니다. 이 영역은 지침이 지양하는 표현(뜻깊·열띤·획기적·성공적으로 운영 등), 쉬운 우리말로 바꿀 외국어(매뉴얼·멘토·멘토링·프로젝트·TF·리더십·데이터·채널·플랫폼·콘텐츠 등, ‘안전매뉴얼’처럼 붙여 쓴 말 포함), ‘2026. 4. 18.’ 같은 공문서식 날짜도 표시합니다. 표시는 참고용이며 최종 판단은 담당자가 합니다.</li>
     <li><strong>맞춤법 검사</strong>를 누릅니다. 현재 편집 중인 초안을 선택한 AI가 검토합니다.</li>
     <li><strong>맞춤법 수정안 확인</strong>에서 원문·수정안·수정 이유를 비교한 뒤 <strong>수정안 적용</strong> 또는 <strong>적용하지 않기</strong>를 선택합니다.</li>
     <li>적용을 취소하려면 초안 입력칸에 포커스를 두고 <kbd>Ctrl</kbd> + <kbd>Z</kbd>를 누릅니다. 다른 편집 이후에는 직전 편집부터 차례로 되돌아갑니다.</li>
@@ -302,7 +302,7 @@ HTML = r'''<!doctype html>
   </details>
 </section>
 <footer>
-  <p>인천교육 보도자료 작성기 v0.1.17 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.17">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
+  <p>인천교육 보도자료 작성기 v0.1.18 사용 안내 · <a href="https://github.com/newskool4d-sketch/press-release-writer/releases/tag/v0.1.18">배포 파일과 릴리스 안내</a> · <a href="#main">맨 위로</a></p>
   <p>이 HTML은 그림·스타일을 포함하므로 내려받아 브라우저에서 바로 열 수 있습니다. 외부 링크와 AI 서비스 이용에는 인터넷 연결이 필요합니다. 화면 예시는 가상 자료이며 실제 보도자료가 아닙니다.</p>
 </footer>
 </main>
@@ -348,8 +348,8 @@ HTML = HTML.replace("@@PROOFREAD@@", data_uri(SHOTS / "proofreading.png", "image
 script = re.search(r"<script>(.*?)</script>", HTML, re.S).group(1)
 HTML = HTML.replace("@@SCRIPTHASH@@", base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii"))
 payload = HTML.encode("utf-8")
-local = ROOT / "사용안내_v0.1.17.html"
-release = ROOT / "artifacts/v0.1.17/release/PressReleaseWriter-Guide-ko.html"
+local = ROOT / "사용안내_v0.1.18.html"
+release = ROOT / "artifacts/v0.1.18/release/PressReleaseWriter-Guide-ko.html"
 release.parent.mkdir(parents=True, exist_ok=True)
 local.write_bytes(payload)
 release.write_bytes(payload)

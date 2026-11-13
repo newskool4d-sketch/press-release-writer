@@ -34,7 +34,8 @@ public static class Timeliness
             return null;
         }
         if (!int.TryParse(match.Groups["y"].Value, out var year) || !int.TryParse(match.Groups["m"].Value, out var month) ||
-            !int.TryParse(match.Groups["d"].Value, out var day) || month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(year, month))
+            // A year before 1900 is a typing slip, and year 0 or 1 would overflow the date arithmetic that follows.
+            !int.TryParse(match.Groups["d"].Value, out var day) || year < 1900 || month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(year, month))
         {
             malformed = true;
             return null;
