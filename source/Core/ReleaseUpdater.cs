@@ -47,6 +47,7 @@ public static class ReleaseUpdater
     const int MaxMetadataBytes = 1024 * 1024;
     static readonly TimeSpan MetadataTimeout = TimeSpan.FromSeconds(20);
     static readonly TimeSpan DownloadTimeout = TimeSpan.FromMinutes(15);
+    static readonly TimeSpan ReplaceLockTimeout = TimeSpan.FromSeconds(12);
     // Keep recent unfinished stages for recovery. Older stages still need an exclusive cleanup lease.
     static readonly TimeSpan OrphanStageAge = TimeSpan.FromHours(24);
 
@@ -322,12 +323,7 @@ public static class ReleaseUpdater
             using (var staged = File.OpenRead(sibling))
                 if (!DigestEquals(SHA256.HashData(staged), digest)) return false;
             if (ReadProductVersion(sibling) != expected || ReadProductVersion(target) != oldVersion) return false;
-            try { File.Replace(sibling, target, backup); }
-            catch
-            {
-                if (!File.Exists(target) && File.Exists(backup)) File.Move(backup, target);
-                throw;
-            }
+            ReplaceWithLockRetry(sibling, target, backup, oldVersion);
             PruneBackups(target, backup);
             return true;
         }
@@ -335,6 +331,34 @@ public static class ReleaseUpdater
         {
             TryDelete(sibling);
             mutex.ReleaseMutex();
+        }
+    }
+
+    static void ReplaceWithLockRetry(string sibling, string target, string backup, Version oldVersion)
+    {
+        const int SharingViolation = unchecked((int)0x80070020);
+        const int LockViolation = unchecked((int)0x80070021);
+        var elapsed = Stopwatch.StartNew();
+        while (true)
+        {
+            try
+            {
+                File.Replace(sibling, target, backup);
+                return;
+            }
+            catch (IOException ex) when ((ex.HResult is SharingViolation or LockViolation) &&
+                elapsed.Elapsed < ReplaceLockTimeout && File.Exists(sibling) && File.Exists(target) && !File.Exists(backup))
+            {
+                // A reader can hold the old image briefly after the app exits. Retry an untouched replacement only.
+                Thread.Sleep(200);
+                RequireRegularPath(target);
+                if (ReadProductVersion(target) != oldVersion) throw;
+            }
+            catch
+            {
+                if (!File.Exists(target) && File.Exists(backup)) File.Move(backup, target);
+                throw;
+            }
         }
     }
 

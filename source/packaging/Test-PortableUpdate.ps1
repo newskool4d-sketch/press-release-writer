@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$OldExe,
     [Parameter(Mandatory)][string]$NewExe,
-    [Parameter(Mandatory)][string]$EvidenceDirectory
+    [Parameter(Mandatory)][string]$EvidenceDirectory,
+    [switch]$TransientTargetRead
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,7 +56,15 @@ try {
     }
     finally { $imageLock.Dispose() }
     if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $originalHash) { throw 'Updater replaced a running app.' }
-    if (-not $oldApp.CloseMainWindow() -or -not $oldApp.WaitForExit(12000)) { throw 'The isolated original test window did not close.' }
+    $targetRead = if ($TransientTargetRead) { [IO.File]::OpenRead($target) }
+    try {
+        if (-not $oldApp.CloseMainWindow() -or -not $oldApp.WaitForExit(12000)) { throw 'The isolated original test window did not close.' }
+        # Keep the old image open for reading while the helper attempts the replace.
+        if ($targetRead -and $helper.WaitForExit(8000)) {
+            throw "Update helper exited while a temporary reader held the old image: $($helper.ExitCode)"
+        }
+    }
+    finally { if ($targetRead) { $targetRead.Dispose() } }
     if (-not $helper.WaitForExit(55000) -or $helper.ExitCode -ne 0) { throw 'Update helper did not complete successfully.' }
 
     $backups = @(Get-ChildItem -LiteralPath $install -File -Filter '*.previous-*.bak')
@@ -66,7 +75,7 @@ try {
     }
     $updatedApp = Start-Process -FilePath $target -ArgumentList $appArgs -WindowStyle Hidden -PassThru
     Wait-ReadyWindow $updatedApp $newVersion
-    $result = [pscustomobject]@{ OldVersion=$previousVersion; NewVersion=$newVersion; OldHash=$originalHash;
+    $result = [pscustomobject]@{ OldVersion=$previousVersion; NewVersion=$newVersion; OldHash=$originalHash; TransientTargetRead=[bool]$TransientTargetRead;
         NewHash=$newHash; UpdatedWindow=$updatedApp.MainWindowTitle; Target=$target; Backup=$backups[0].FullName; Passed=$true }
     $json = $result | ConvertTo-Json
     [IO.File]::WriteAllText((Join-Path $evidence 'update-result.json'), $json, [Text.UTF8Encoding]::new($false))
