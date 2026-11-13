@@ -37,7 +37,7 @@ try {
         Invoke-Dotnet -Arguments @('publish', 'Desktop/Desktop.csproj', '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true', '-p:PublishSingleFile=true', '-p:IncludeNativeLibrariesForSelfExtract=true', '-p:DebugType=none', '--disable-build-servers', '-p:UseSharedCompilation=false', '-o', $output, '--verbosity', 'minimal')
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'notices') -Destination $output -Recurse -Force
         Copy-Item -LiteralPath (Join-Path $root '사용안내.html') -Destination (Join-Path $output '사용안내.html') -Force
-        Copy-Item -LiteralPath (Join-Path $root "사용안내_v$version.md") -Destination (Join-Path $output '사용안내.md') -Force
+        Copy-Item -LiteralPath (Join-Path $root '사용안내.md') -Destination (Join-Path $output '사용안내.md') -Force
     }
 }
 finally {

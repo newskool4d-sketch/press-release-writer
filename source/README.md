@@ -1,4 +1,4 @@
-# 인천교육 보도자료 작성기 MVP 0.1.19
+# 인천교육 보도자료 작성기 MVP 0.1.20
 
 Windows 11 x64용 로컬 WPF 앱입니다. 상단 **설정 → AI 연결**에서 Claude Code, Codex, Gemini의 상태 및 외부 AI 전송 동의를 관리합니다. **설정 → 화면 설정**에서 라이트·다크 모드와 11~20포인트 글자 크기를 선택합니다. 원자료와 초안 사이 구분선을 끌어 폭을 조절할 수 있습니다.
 
@@ -47,7 +47,7 @@ Windows 11 x64용 로컬 WPF 앱입니다. 상단 **설정 → AI 연결**에서
 
 시스템 SDK가 있으면 `-DotnetPath`를 생략할 수 있습니다. NuGet 패키지 복원에는 네트워크가 필요합니다. 검증 스크립트는 SDK 상태·패키지를 프로젝트 `.tools`에 두고 SDK의 개발용 인증서 자동 생성을 끕니다.
 
-`-ProbeCodex`는 설치된 공식 CLI를 빈 앱 전용 `CODEX_HOME`으로 실행해 초기 연결과 미로그인 계정 조회를 검사합니다. `-Publish`는 런타임을 포함한 x64 단일 실행 파일과 고지·사용 안내를 `artifacts/v0.1.19/portable`에 만듭니다.
+`-ProbeCodex`는 설치된 공식 CLI를 빈 앱 전용 `CODEX_HOME`으로 실행해 초기 연결과 미로그인 계정 조회를 검사합니다. `-Publish`는 런타임을 포함한 x64 단일 실행 파일과 고지·사용 안내를 `artifacts/v0.1.20/portable`에 만듭니다.
 
 선택한 한글 PDF의 추출 검사는 별도로 실행할 수 있습니다.
 
@@ -60,7 +60,7 @@ PDF를 제공하지 않으면 PDF 항목은 통과로 처리하지 않고 SKIP�
 NSIS 설치 패키지는 필요할 때 별도로 빌드합니다. 경로는 절대 경로를 권장합니다.
 
 ```powershell
-makensis /DVERSION=0.1.19 /DOUTPUT=C:\출력\PressReleaseWriter_Setup_v0.1.19.exe /DPAYLOAD=C:\프로젝트\artifacts\v0.1.19\portable .\source\packaging\Setup.nsi
+makensis /DVERSION=0.1.20 /DOUTPUT=C:\출력\PressReleaseWriter_Setup_v0.1.20.exe /DPAYLOAD=C:\프로젝트\artifacts\v0.1.20\portable .\source\packaging\Setup.nsi
 ```
 
 ## 공개 배포와 자동 업데이트
